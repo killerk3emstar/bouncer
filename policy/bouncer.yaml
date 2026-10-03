@@ -76,7 +76,7 @@ principals:
     key_env: BOUNCER_KEY_PLAYGROUND    # used by the dashboard playground
     team: security
     data_clearance: internal
-    models: [qwen3:8b, gpt-4o-mini]
+    models: [gpt-4o-mini, qwen3:8b]    # first = default in the playground (simulated model answers instantly)
     tools: [kb.search, web.fetch, mail.send]
 
 # ---------------------------------------------------------------------------
