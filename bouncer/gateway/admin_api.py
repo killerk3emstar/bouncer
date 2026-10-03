@@ -117,7 +117,7 @@ DESCRIPTIONS = {
     "signatures": "Signed feed of historical attack signatures, reloaded without restart.",
     "supply_chain": "Model source allowlist, trust_remote_code and safetensors rules, MCP server allowlist.",
     "mcp_pinning": "Hash of each MCP tool definition; a changed definition is blocked until re-approved.",
-    "approvals": "require_approval creates a request; an approval allows exactly that call for a limited time.",
+    "approvals": "require_approval creates a request; an approval allows that exact call once, for the same agent and session, within a time window.",
     "harmful_content": "Judge question on harm categories, answered in the same pass.",
 }
 
@@ -389,7 +389,7 @@ async def controls(request: Request) -> dict[str, Any]:
             if t["last_triggered"] is None or ev["ts"] > t["last_triggered"]:
                 t["last_triggered"] = ev["ts"]
     out = []
-    for cid, meta in {**CONTROL_CATALOG, "harmful_content": {"title": "Harmful content (judge)", "owasp_llm": ["LLM05"], "owasp_agentic": [], "tier": "T2"}}.items():
+    for cid, meta in CONTROL_CATALOG.items():
         st = _control_state(g, cid)
         c = counts.get(cid, {"allow": 0, "block": 0, "total": 0})
         res = by_ctl.get(cid, {})
@@ -426,7 +426,7 @@ async def controls(request: Request) -> dict[str, Any]:
 async def coverage(request: Request) -> dict[str, Any]:
     g = gw(request)
     counts = _case_counts()
-    states = {cid: _control_state(g, cid) for cid in [*CONTROL_CATALOG, "harmful_content"]}
+    states = {cid: _control_state(g, cid) for cid in CONTROL_CATALOG}
     risks = []
     tally = {"covered": 0, "partial": 0, "none": 0}
     by_fw: dict[str, Counter] = {"owasp_llm_2025": Counter(), "owasp_agentic_2026": Counter()}
