@@ -152,6 +152,19 @@ class GatewayState:
     clients: dict[str, httpx.AsyncClient] = field(default_factory=dict)
     feed_store: Any = None
     started_at: float = 0.0
+    model_slots: dict[tuple[str, int], Any] = field(default_factory=dict)
+
+    def model_slot(self, model: str, limit: int | None) -> Any:
+        """asyncio.Semaphore for models.<id>.max_concurrency (protects a shared local GPU); None = no limit."""
+        import asyncio
+
+        if not limit:
+            return None
+        key = (model, int(limit))
+        sem = self.model_slots.get(key)
+        if sem is None:
+            sem = self.model_slots[key] = asyncio.Semaphore(int(limit))
+        return sem
 
     def client_for(self, base_url: str) -> httpx.AsyncClient:
         c = self.clients.get(base_url)

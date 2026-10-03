@@ -204,6 +204,8 @@ class PolicyManager:
             self._fail(PolicyError(f"Cannot read policy file: {exc}"))
             return False
         if self._current is not None and text == self._current.text:
+            if self.last_error is not None:  # the active version was restored after a rejected edit
+                self.last_error = None
             return False
         try:
             doc = parse_policy(text)

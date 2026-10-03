@@ -29,7 +29,7 @@ def render_summary(stats: dict[str, Any], coverage: dict[str, Any], budgets: dic
     posture = coverage["posture"]
     rows_budget = "".join(
         f"<tr><td>{_e(b['team'])}</td><td class=n>${b['spent_usd']:.4f}</td><td class=n>{f"${b['usd_per_day']:.2f}" if b['usd_per_day'] is not None else '-'}</td>"
-        f"<td class={'bad' if b['state'] == 'exceeded' else ('warn' if b['state'] == 'warning' else '')}>{_e(b['state'])}</td></tr>"
+        f"<td class={'bad' if b['state'] in ('blocked', 'exceeded') else ('warn' if b['state'] in ('warning', 'downgraded') else '')}>{_e(b['state'])}</td></tr>"
         for b in budgets["teams"]
     )
     rows_threats = "".join(f"<tr><td>{_e(c['control'])}</td><td class=n>{c['count']}</td><td class=n>{c['block']}</td><td class=n>{c['redact']}</td><td class=n>{c['require_approval']}</td></tr>" for c in stats["top_controls"]) or "<tr><td colspan=5 class=muted>No findings in this window.</td></tr>"

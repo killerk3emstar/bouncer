@@ -930,7 +930,7 @@ class Engine:
         }
         if untrusted:
             state["UNTRUSTED_CONTENT"] = _clip(untrusted, 1200)
-        res = await self._judge_call(ctx, state, qs, "side_effect_action")
+        res = await self._judge_call(ctx, state, qs, "side_effect_tool")
         if res is None:
             return []
         if res.get("error"):

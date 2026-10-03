@@ -245,7 +245,7 @@ audit:
   path: data/audit.jsonl
   hash_chain: true                 # each line carries the hash of the previous one
   excerpt_chars: 300               # only post-redaction excerpts are stored, never raw secrets
-  retention_days: 30
+  retention_days: 30               # informational in this build: rotate or ship data/audit.jsonl externally
 
 approvals:
   ttl_seconds: 600                 # an approval allows exactly that call (hash) for this long

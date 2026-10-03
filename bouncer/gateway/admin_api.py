@@ -272,7 +272,21 @@ async def event_detail(request: Request, trace_id: str) -> Any:
 # ---------------------------------------------------------------------------- controls and coverage
 
 
+_CASE_COUNTS: dict[str, Any] = {"key": None, "value": None}
+
+
 def _case_counts() -> dict[str, dict[str, int]]:
+    """Test cases per control, re-read only when a file in tests/cases/ changes."""
+    files = sorted((ROOT / "tests" / "cases").glob("*.yaml"))
+    key = tuple((p.name, p.stat().st_mtime_ns) for p in files)
+    if _CASE_COUNTS["key"] == key:
+        return _CASE_COUNTS["value"]
+    value = _read_case_counts()
+    _CASE_COUNTS.update({"key": key, "value": value})
+    return value
+
+
+def _read_case_counts() -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = defaultdict(lambda: {"allow": 0, "block": 0, "total": 0})
     for path in sorted((ROOT / "tests" / "cases").glob("*.yaml")):
         try:
@@ -678,7 +692,8 @@ async def budgets(request: Request) -> dict[str, Any]:
             gpu = g.store.gpu_seconds_last_hour(team)
             state = "ok"
             if tb.usd_per_day is not None and spent >= tb.usd_per_day:
-                state = "exceeded"
+                # what happens to the next paid request: downgraded to the local model, or blocked
+                state = "downgraded" if (b.on_exceed.action == "downgrade" and b.on_exceed.downgrade_to) else "blocked"
             elif tb.usd_per_day and spent >= 0.8 * tb.usd_per_day:
                 state = "warning"
             teams.append(
@@ -856,10 +871,16 @@ class ApprovalDecision(BaseModel):
 async def decide_approval(request: Request, approval_id: str, body: ApprovalDecision) -> Any:
     g = gw(request)
     if body.decision not in ("approve", "deny"):
-        return JSONResponse({"error": {"type": "invalid_request", "message": "decision must be approve or deny"}}, status_code=400)
+        return JSONResponse({"error": {"type": "invalid_request", "code": "approvals.invalid_decision", "message": "decision must be approve or deny"}}, status_code=422)
+    existing = next((a for a in g.store.list_approvals() if a.id == approval_id), None)
+    if existing is None:
+        return JSONResponse({"error": {"type": "not_found", "code": "approvals.not_found", "message": f"No approval {approval_id}"}}, status_code=404)
+    if existing.status != "pending":
+        return JSONResponse(
+            {"error": {"type": "conflict", "code": "approvals.already_decided", "message": f"Approval {approval_id} is already {existing.status}.", "approval": _approval_dict(existing, g)}},
+            status_code=409,
+        )
     appr = g.store.decide_approval(approval_id, body.decision, body.note, g.policies.current.doc.approvals.ttl_seconds)
-    if appr is None:
-        return JSONResponse({"error": {"type": "not_found", "message": f"No approval {approval_id}"}}, status_code=404)
     g.audit.write(
         {
             "type": "approval.decided",
@@ -883,6 +904,7 @@ class PlaygroundIn(BaseModel):
     prompt: str | None = None
     system: str | None = None
     untrusted_tool_result: str | None = None
+    tool_name: str | None = None
     messages: list[dict[str, Any]] | None = None
     session_id: str | None = None
 
@@ -900,7 +922,8 @@ async def playground(request: Request, body: PlaygroundIn) -> Any:
             messages.append({"role": "system", "content": body.system})
         messages.append({"role": "user", "content": body.prompt or ""})
         if body.untrusted_tool_result:
-            messages.append({"role": "assistant", "content": None, "tool_calls": [{"id": "pg_fetch", "type": "function", "function": {"name": "web__fetch", "arguments": json.dumps({"url": "https://vendor.example/playground"})}}]})
+            tool = (body.tool_name or "web.fetch").replace(".", "__")
+            messages.append({"role": "assistant", "content": None, "tool_calls": [{"id": "pg_fetch", "type": "function", "function": {"name": tool, "arguments": json.dumps({"url": "https://vendor.example/playground"})}}]})
             messages.append({"role": "tool", "tool_call_id": "pg_fetch", "content": body.untrusted_tool_result})
     model = body.model or (principal.models[0] if principal.models else None)
     req = {"model": model, "messages": messages}

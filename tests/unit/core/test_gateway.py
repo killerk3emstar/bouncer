@@ -399,3 +399,17 @@ def test_content_parts_of_any_type_are_scanned(env, ptype: str) -> None:  # noqa
     body = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": [{"type": ptype, "text": "key AKIAIOSFODNN7EXAMPLE"}]}]}
     asyncio.run(_post(app, body))
     assert "AKIAIOSFODNN7EXAMPLE" not in json.dumps(mock.requests[-1])
+
+
+def test_deciding_an_approval_twice_is_a_conflict(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    mock.script([{"tool_calls": [{"name": "payments__create_transfer", "arguments": {"from_account": "A", "to_iban": "PL61109010140000071219812874", "amount": 5000, "currency": "PLN", "title": "x"}}]}])
+    appr = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Pay invoice 5000 PLN"}]})).json()["error"]["approval_id"]
+
+    async def decide(decision: str) -> httpx.Response:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.post(f"/api/approvals/{appr}", json={"decision": decision})
+
+    assert asyncio.run(decide("approve")).status_code == 200
+    assert asyncio.run(decide("deny")).status_code == 409
+    assert asyncio.run(decide("maybe")).status_code == 422

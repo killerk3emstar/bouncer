@@ -260,10 +260,15 @@ async def handle_chat(g: GatewayState, principal: Principal, body: dict[str, Any
             headers["authorization"] = f"Bearer {key}"
     client = g.client_for(upstream.base_url)
 
+    slot = g.model_slot(ctx.model, mcfg.max_concurrency)
     if not stream:
         t = time.perf_counter()
         try:
-            resp = await client.post("/chat/completions", json=fwd, headers=headers)
+            if slot is not None:
+                async with slot:
+                    resp = await client.post("/chat/completions", json=fwd, headers=headers)
+            else:
+                resp = await client.post("/chat/completions", json=fwd, headers=headers)
         except httpx.HTTPError as exc:
             return upstream_error(g, ctx, f"{type(exc).__name__}: {exc}", input_action)
         ctx.latency["upstream"] = (time.perf_counter() - t) * 1000
@@ -271,7 +276,7 @@ async def handle_chat(g: GatewayState, principal: Principal, body: dict[str, Any
             return upstream_error(g, ctx, f"upstream returned HTTP {resp.status_code}: {resp.text[:300]}", input_action, resp.status_code)
         out = resp.json()
         return await finish_plain(g, ctx, body, out, input_action)
-    return await start_stream(g, ctx, body, fwd, headers, client, input_action, client_wants_usage)
+    return await start_stream(g, ctx, body, fwd, headers, client, input_action, client_wants_usage, slot)
 
 
 def _with_canary(messages: list[dict[str, Any]], canary: str) -> list[dict[str, Any]]:
@@ -421,16 +426,22 @@ class StreamGuard:
         return max(end, self.emitted)
 
 
-async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], fwd: dict[str, Any], headers: dict[str, str], client: httpx.AsyncClient, input_action: Action, client_wants_usage: bool) -> Any:
+async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], fwd: dict[str, Any], headers: dict[str, str], client: httpx.AsyncClient, input_action: Action, client_wants_usage: bool, slot: Any = None) -> Any:
     t0 = time.perf_counter()
     req = client.build_request("POST", "/chat/completions", json=fwd, headers=headers)
+    if slot is not None:
+        await slot.acquire()  # released when the stream ends
     try:
         resp = await client.send(req, stream=True)
     except httpx.HTTPError as exc:
+        if slot is not None:
+            slot.release()
         return upstream_error(g, ctx, f"{type(exc).__name__}: {exc}", input_action)
     if resp.status_code >= 400:
         text = (await resp.aread()).decode(errors="replace")
         await resp.aclose()
+        if slot is not None:
+            slot.release()
         return upstream_error(g, ctx, f"upstream returned HTTP {resp.status_code}: {text[:300]}", input_action, resp.status_code)
 
     guard = StreamGuard(g, ctx)
@@ -536,6 +547,8 @@ async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], f
             g.engine.finish(ctx, overall, u, direction=ctx.direction, extra={"stream": True})
         finally:
             await resp.aclose()
+            if slot is not None:
+                slot.release()
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=out_headers)
 

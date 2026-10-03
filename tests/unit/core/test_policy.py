@@ -171,3 +171,14 @@ def test_external_judge_check_cannot_be_bypassed_with_userinfo() -> None:
     with pytest.raises(PolicyError) as exc:
         parse_policy(text)
     assert "allow_external" in exc.value.message
+
+
+def test_restoring_the_active_file_clears_the_reload_error(policy_file: Path) -> None:
+    mgr = PolicyManager(policy_file)
+    mgr.load_initial()
+    good = policy_file.read_text()
+    policy_file.write_text(good.replace("version: 1", "version: [1", 1))
+    assert mgr.reload() is False and mgr.last_error is not None
+    policy_file.write_text(good)
+    mgr.reload()
+    assert mgr.last_error is None
