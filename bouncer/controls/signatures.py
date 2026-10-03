@@ -351,6 +351,14 @@ class FeedStore:
         except ValueError as exc:
             raise FeedVerifyError(f"feed is not valid JSON: {exc}") from exc
 
+        with self._lock:
+            current = self.active
+        if current is not None and model.feed == current.model.feed and model.version < current.model.version:
+            # an older feed, even with a valid signature, would silently remove newer signatures
+            raise FeedVerifyError(
+                f"feed version {model.version} is older than the active version {current.model.version} (rollback refused)"
+            )
+
         compiled: list[CompiledSignature] = []
         for sig in model.signatures:
             try:

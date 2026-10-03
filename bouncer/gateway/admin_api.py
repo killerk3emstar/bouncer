@@ -905,7 +905,8 @@ async def playground(request: Request, body: PlaygroundIn) -> Any:
     model = body.model or (principal.models[0] if principal.models else None)
     req = {"model": model, "messages": messages}
     t = time.perf_counter()
-    resp = await handle_chat(g, principal, req, body.session_id or f"pg_{int(time.time() * 1000)}", route="openai.chat")
+    principal.via = "dashboard-playground"  # audited as playground traffic, not as the agent's own calls
+    resp = await handle_chat(g, principal, req, body.session_id or f"pg_{int(time.time() * 1000)}", route="playground")
     elapsed = (time.perf_counter() - t) * 1000
     trace_id = resp.headers.get("x-bouncer-trace-id")
     payload = json.loads(resp.body) if hasattr(resp, "body") else {}

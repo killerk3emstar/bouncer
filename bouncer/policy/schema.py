@@ -332,7 +332,9 @@ class PolicyDoc(Strict):
                     f"budgets.on_exceed.downgrade_to: unknown model '{self.budgets.on_exceed.downgrade_to}'"
                 )
         if self.judge.allow_external is False:
-            host = self.judge.url.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0]
+            from urllib.parse import urlsplit
+
+            host = (urlsplit(self.judge.url).hostname or "").lower()
             if host not in {"localhost", "127.0.0.1", "::1", "judge", "host.docker.internal"} and not host.endswith(
                 ".local"
             ):

@@ -275,3 +275,33 @@ def test_url_feed_loads_and_verifies(tmp_path: Path, record_property):  # noqa: 
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_rollback_to_older_signed_feed_is_refused(tmp_path: Path, record_property):  # noqa: ANN001
+    record_property("kind", "block")
+    import os
+    import time as _t
+
+    from nacl.signing import SigningKey
+
+    sk = SigningKey.generate()
+    feed = tmp_path / "feed.json"
+    pub = tmp_path / "feed.pub"
+    pub.write_text(base64.b64encode(bytes(sk.verify_key)).decode())
+
+    def write_signed(doc: dict) -> None:
+        body = (json.dumps(doc, indent=2) + "\n").encode()
+        feed.write_bytes(body)
+        (tmp_path / "feed.json.sig").write_text(base64.b64encode(sk.sign(body).signature).decode())
+
+    doc = json.loads(FEED.read_text())
+    doc["version"] = 5
+    write_signed(doc)
+    store = FeedStore(feed=str(feed), public_key=str(pub), require_signature=True, refresh_seconds=1)
+    assert store.active.version == 5
+    old = dict(doc, version=4, signatures=doc["signatures"][:3])  # validly signed, older, fewer signatures
+    write_signed(old)
+    os.utime(feed, (_t.time() + 5, _t.time() + 5))
+    store.maybe_refresh()
+    assert store.active.version == 5 and len(store.active.compiled) == len(doc["signatures"])
+    assert "rollback" in (store.last_error or "")

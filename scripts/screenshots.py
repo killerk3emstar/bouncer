@@ -73,7 +73,9 @@ async def main() -> None:
             path = OUT / f"dashboard_{name}.png"
             await page.screenshot(path=str(path), full_page=name not in ("events",) and not name.startswith("trace_"))
             print("wrote", path.relative_to(OUT.parent.parent))
-        await page.goto(f"{args.base}/reports/summary" + (f"?token={token}" if token else ""))
+        if token:
+            await ctx.set_extra_http_headers({"Authorization": f"Bearer {token}"})
+        await page.goto(f"{args.base}/reports/summary")
         await page.wait_for_timeout(800)
         await page.screenshot(path=str(OUT / "report_summary.png"), full_page=True)
         print("wrote presentation/assets/report_summary.png")

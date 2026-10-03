@@ -134,7 +134,7 @@ def create_app(
             import hmac
 
             auth = request.headers.get("authorization", "")
-            given = auth[7:].strip() if auth.lower().startswith("bearer ") else (request.query_params.get("token") or "")
+            given = auth[7:].strip() if auth.lower().startswith("bearer ") else ""  # header only: query strings end up in logs
             if not hmac.compare_digest(given.encode(), token.encode()):
                 return JSONResponse({"error": {"type": "unauthorized", "message": "Admin token required (Authorization: Bearer <BOUNCER_ADMIN_TOKEN>)."}}, status_code=401)
         return await call_next(request)

@@ -86,3 +86,18 @@ def test_trace_keeps_the_decision_first(tmp_path: Path) -> None:
     assert [e["type"] for e in log.trace("tr_x")] == ["decision", "approval.decided"]
     resumed = AuditLog(tmp_path / "a.jsonl")
     assert resumed.get("tr_x")["action"] == "require_approval"
+
+
+def test_csv_neutralizes_formulas(tmp_path: Path) -> None:
+    log = AuditLog(tmp_path / "a.jsonl")
+    log.write({"type": "decision", "trace_id": "a", "action": "allow", "excerpt": "=HYPERLINK(\"http://x\",\"y\")"})
+    assert "'=HYPERLINK" in to_csv(log.query())
+
+
+def test_removed_tail_lines_are_detected(tmp_path: Path) -> None:
+    p = tmp_path / "audit.jsonl"
+    _write(p, 5)
+    lines = p.read_text().splitlines()
+    p.write_text("\n".join(lines[:3]) + "\n")
+    res = verify_file(p)
+    assert not res["ok"] and "removed from the end" in res["error"]

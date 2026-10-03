@@ -103,6 +103,12 @@ class AuditLog:
                         fh.flush()
                         os.fsync(fh.fileno())
             self._remember(ev)
+            if self.path:
+                # sidecar with the newest seq and hash: lines removed from the end of the log are detectable
+                head = self.path.with_name(self.path.name + ".head")
+                tmp = head.with_name(head.name + ".tmp")
+                tmp.write_text(json.dumps({"seq": ev["seq"], "hash": ev["hash"]}))
+                os.replace(tmp, head)
         for q in list(self._subscribers):
             try:
                 q.put_nowait(ev)
@@ -176,6 +182,13 @@ CSV_FIELDS = [
 ]
 
 
+def _cell(value: Any) -> Any:
+    """Neutralize spreadsheet formulas: audit text is attacker-controlled (prompts, tool output)."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def to_csv(events: list[dict[str, Any]]) -> str:
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=CSV_FIELDS)
@@ -183,8 +196,7 @@ def to_csv(events: list[dict[str, Any]]) -> str:
     for ev in events:
         p = ev.get("principal") or {}
         lat = ev.get("latency_ms") or {}
-        w.writerow(
-            {
+        w.writerow({k: _cell(v) for k, v in {
                 "ts": ev.get("ts"),
                 "seq": ev.get("seq"),
                 "trace_id": ev.get("trace_id"),
@@ -201,8 +213,7 @@ def to_csv(events: list[dict[str, Any]]) -> str:
                 "policy_version": (ev.get("policy") or {}).get("version"),
                 "excerpt": ev.get("excerpt"),
                 "hash": ev.get("hash"),
-            }
-        )
+            }.items()})
     return buf.getvalue()
 
 
@@ -241,4 +252,18 @@ def verify_file(path: str | Path) -> dict[str, Any]:
             expected_seq = ev.get("seq", 0) + 1
             prev = ev["hash"]
             checked += 1
+    head = Path(path).with_name(Path(path).name + ".head")
+    if head.exists():
+        try:
+            h = json.loads(head.read_text())
+        except (OSError, json.JSONDecodeError):
+            h = {}
+        if h.get("hash") and h.get("hash") != prev:
+            return {
+                "ok": False,
+                "checked": checked,
+                "line": checked + 1,
+                "seq": h.get("seq"),
+                "error": f"the log ends at seq {expected_seq - 1 if expected_seq else 0} but the head record says seq {h.get('seq')}: lines were removed from the end",
+            }
     return {"ok": True, "checked": checked, "last_hash": prev}

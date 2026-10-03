@@ -164,3 +164,10 @@ def test_feed_settings_change_rebuilds_the_feed_store(policy_file: Path) -> None
     assert mgr.reload()
     assert mgr.shared["feed_store"] is not first
     assert mgr.shared["feed_store"].require_signature is False
+
+
+def test_external_judge_check_cannot_be_bypassed_with_userinfo() -> None:
+    text = POLICY.read_text().replace("url: http://localhost:8701", "url: http://localhost:x@judge.attacker.example:8701", 1)
+    with pytest.raises(PolicyError) as exc:
+        parse_policy(text)
+    assert "allow_external" in exc.value.message
