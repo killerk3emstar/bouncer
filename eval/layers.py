@@ -78,11 +78,28 @@ def t0() -> GatewayLayer:
     return GatewayLayer("t0", t1="off", judge="none")
 
 
+def _require_judge() -> None:
+    import urllib.request
+
+    import yaml
+
+    url = yaml.safe_load((ROOT / "policy" / "bouncer.yaml").read_text())["judge"]["url"].rstrip("/") + "/health"
+    try:
+        with urllib.request.urlopen(url, timeout=2) as r:  # noqa: S310 (local judge)
+            if r.status == 200:
+                return
+    except OSError:
+        pass
+    raise SystemExit(f"The pipeline layer needs the T2 judge at {url}. Start it with `make judge` (or run `make eval` for T0 and T1 only).")
+
+
 def pipeline() -> GatewayLayer:
     """T0 + T1 (ONNX) + T2 judge from the policy (Clef on :8701)."""
+    _require_judge()
     return GatewayLayer("pipeline", t1="onnx", judge=None)
 
 
 def pipeline_tool_result() -> GatewayLayer:
     """Same as pipeline, but every text is treated as the result of web.fetch (indirect injection path)."""
+    _require_judge()
     return GatewayLayer("pipeline_tool_result", t1="onnx", judge=None, source="tool_result:web.fetch")
