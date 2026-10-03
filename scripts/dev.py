@@ -30,9 +30,25 @@ def pump(name: str, proc: subprocess.Popen) -> None:
         sys.stdout.flush()
 
 
+def judge_is_up(url: str = "http://localhost:8701/health") -> bool:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=1.5) as r:  # noqa: S310 (local health check)
+            return r.status == 200
+    except OSError:
+        return False
+
+
 def main() -> int:
     os.chdir(ROOT)
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONPATH": str(ROOT)}
+    if "BOUNCER_JUDGE" not in env and not judge_is_up():
+        # Without a judge every escalation would fail closed (blocked). For a first run we use the
+        # deterministic stand-in and say so; `make judge` starts the real one.
+        env["BOUNCER_JUDGE"] = "fake"
+        print("[dev] T2 judge not reachable on :8701: using the deterministic stand-in (BOUNCER_JUDGE=fake).")
+        print("[dev] For the real judge run `make judge` in another terminal, then restart `make dev`.")
     procs: list[tuple[str, subprocess.Popen]] = []
     for name, cmd, port, required in SERVICES:
         if not (ROOT / required).exists():
