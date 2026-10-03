@@ -59,6 +59,7 @@ principals:
     data_clearance: confidential       # public < internal < confidential < restricted
     models: [qwen3:8b, gpt-4o-mini]
     tools: [crm.lookup_customer, kb.search, kb.write, web.fetch, mail.send, payments.create_transfer]
+    may_act_for: [intern-bot]          # agent-to-agent: may call for intern-bot with the intersection of both permissions
   dev-assistant:
     key_env: BOUNCER_KEY_DEV_ASSISTANT
     team: engineering

@@ -157,9 +157,13 @@ class Principal:
     models: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
     profile: str | None = None
+    via: str | None = None  # the agent that called on this principal's behalf (delegation)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "team": self.team}
+        out: dict[str, Any] = {"id": self.id, "team": self.team}
+        if self.via:
+            out["via"] = self.via
+        return out
 
 
 @dataclass(slots=True)

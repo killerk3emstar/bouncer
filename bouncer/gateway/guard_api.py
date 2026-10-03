@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from bouncer.core import Action, Finding, Segment
-from bouncer.gateway.openai_proxy import authenticate, bouncer_headers, gw, unauthorized
+from bouncer.gateway.openai_proxy import authenticate, bouncer_headers, delegation, gw, unauthorized
 from bouncer.pipeline import apply_redactions
 
 router = APIRouter()
@@ -40,6 +40,9 @@ async def guard_check(request: Request, payload: GuardRequest) -> Any:
     principal = authenticate(g, request)
     if principal is None:
         return unauthorized(g, "guard.check")
+    principal, denied = delegation(g, request, principal, "guard.check")
+    if denied is not None:
+        return denied
     result = await run_guard(g, principal, payload, route="guard.check")
     return JSONResponse(result["body"], headers=result["headers"])
 

@@ -56,6 +56,8 @@ class PrincipalCfg(Strict):
     models: list[str] = []
     tools: list[str] = []
     profile: ProfileName | None = None
+    # agents this principal may call on behalf of (X-Bouncer-On-Behalf-Of); permissions become the intersection
+    may_act_for: list[str] = []
 
 
 class TeamBudget(Strict):
@@ -321,6 +323,9 @@ class PolicyDoc(Strict):
             for m in p.models:
                 if m not in self.models:
                     errors.append(f"principals.{pid}.models: unknown model '{m}'")
+            for other in p.may_act_for:
+                if other not in self.principals:
+                    errors.append(f"principals.{pid}.may_act_for: unknown principal '{other}'")
         if self.budgets and self.budgets.on_exceed.downgrade_to:
             if self.budgets.on_exceed.downgrade_to not in self.models:
                 errors.append(

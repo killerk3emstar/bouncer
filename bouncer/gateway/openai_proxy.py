@@ -109,6 +109,37 @@ def authenticate(g: GatewayState, request: Request) -> Principal | None:
     return g.policies.current.principal_for_key(bearer(request))
 
 
+def delegation(g: GatewayState, request: Request, principal: Principal, route: str) -> tuple[Principal, JSONResponse | None]:
+    """Apply X-Bouncer-On-Behalf-Of: the caller acts for another agent with the intersection of both permissions."""
+    target = request.headers.get("x-bouncer-on-behalf-of")
+    if not target or target == principal.id:
+        return principal, None
+    effective, error = g.policies.current.delegate(principal, target.strip())
+    if effective is not None:
+        return effective, None
+    ev = g.audit.write(
+        {
+            "type": "decision",
+            "trace_id": "tr_deleg_" + hashlib.sha256(f"{time.time()}{principal.id}".encode()).hexdigest()[:8],
+            "principal": {**principal.to_dict(), "on_behalf_of": target[:64]},
+            "route": route,
+            "direction": "input",
+            "action": "block",
+            "status_code": 403,
+            "message": error,
+            "findings": [{"id": "auth.delegation_not_allowed", "control": "auth", "rule": "delegation_not_allowed", "tier": "T0", "severity": "high", "action": "block", "effective_action": "block", "message": error, "reason": error, "owasp_llm": ["LLM06"], "owasp_agentic": ["ASI03", "ASI07"]}],
+            "policy": {"version": g.policies.current.version},
+            "latency_ms": {},
+        }
+    )
+    g.telemetry.requests.labels(route, "block").inc()
+    return principal, JSONResponse(
+        error_body("auth.delegation_not_allowed", error or "Delegation not allowed.", ev["trace_id"]),
+        status_code=403,
+        headers={"X-Bouncer-Action": "block", "X-Bouncer-Trace-Id": ev["trace_id"]},
+    )
+
+
 def unauthorized(g: GatewayState, route: str) -> JSONResponse:
     ev = g.audit.write(
         {
@@ -152,6 +183,9 @@ async def chat_completions(request: Request) -> Any:
     principal = authenticate(g, request)
     if principal is None:
         return unauthorized(g, "openai.chat")
+    principal, denied = delegation(g, request, principal, "openai.chat")
+    if denied is not None:
+        return denied
     try:
         body = await request.json()
     except json.JSONDecodeError:

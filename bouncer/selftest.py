@@ -248,7 +248,7 @@ class CaseRunner:
         if mock:
             self.mock_state.script(mock if isinstance(mock, list) else [mock])
         n_before = len(self.mock_state.requests)
-        headers = {"X-Bouncer-Session": step.get("session", session)}
+        headers = {"X-Bouncer-Session": step.get("session", session), **{str(k): str(v) for k, v in (step.get("headers") or {}).items()}}
         if principal is not None and step.get("auth", True):
             headers["Authorization"] = f"Bearer {step.get('api_key') or self.keys.get(principal, 'bk_unknown')}"
         if "guard" in step:

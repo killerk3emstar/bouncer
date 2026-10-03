@@ -91,6 +91,36 @@ class CompiledPolicy:
             profile=p.profile,
         )
 
+    def delegate(self, caller: Principal, on_behalf_of: str) -> tuple[Principal | None, str | None]:
+        """Effective principal when `caller` acts for `on_behalf_of`. Returns (principal, error message)."""
+        target = self.principal(on_behalf_of)
+        if target is None:
+            return None, f"X-Bouncer-On-Behalf-Of names an unknown principal '{on_behalf_of}'."
+        cfg = self.doc.principals.get(caller.id)
+        if cfg is None or on_behalf_of not in cfg.may_act_for:
+            return None, (
+                f"{caller.id} may not act on behalf of {on_behalf_of} (principals.{caller.id}.may_act_for). "
+                "Add the delegation to the policy if this agent is meant to call for the other one."
+            )
+        order = {"public": 0, "internal": 1, "confidential": 2, "restricted": 3}
+        strictness = {"permissive": 0, "balanced": 1, "strict": 2}
+        clearance = min(caller.data_clearance, target.data_clearance, key=lambda c: order.get(c, 0))
+        p_caller = caller.profile or self.doc.profile
+        p_target = target.profile or self.doc.profile
+        profile = max(p_caller, p_target, key=lambda p: strictness.get(p, 1))
+        return (
+            Principal(
+                id=target.id,
+                team=target.team,
+                data_clearance=clearance,
+                models=[m for m in target.models if m in caller.models],
+                tools=[t for t in target.tools if t in caller.tools],
+                profile=profile,
+                via=caller.id,
+            ),
+            None,
+        )
+
     def principal_for_key(self, key: str | None) -> Principal | None:
         if not key:
             return None
