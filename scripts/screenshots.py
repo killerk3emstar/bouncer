@@ -29,8 +29,16 @@ VIEWS = [
 ]
 
 
+def _admin_headers() -> dict[str, str]:
+    import os
+
+    token = os.environ.get("BOUNCER_ADMIN_TOKEN", "")
+    return {"Authorization": f"Bearer {token}"} if token and token.lower() != "off" else {}
+
+
 def pick_trace(base: str, action: str) -> str | None:
-    with urllib.request.urlopen(f"{base}/api/events?action={action}&limit=50") as r:  # noqa: S310 (local)
+    req = urllib.request.Request(f"{base}/api/events?action={action}&limit=50", headers=_admin_headers())
+    with urllib.request.urlopen(req) as r:  # noqa: S310 (local)
         events = json.load(r)["events"]
     for ev in events:
         if ev.get("findings"):
@@ -55,13 +63,17 @@ async def main() -> None:
         browser = await p.chromium.launch()
         ctx = await browser.new_context(viewport={"width": 1440, "height": 1000}, device_scale_factor=2, color_scheme=args.theme)
         page = await ctx.new_page()
+        token = _admin_headers().get("Authorization", "")[7:]
+        if token:  # the dashboard stores a token passed as ?token= and removes it from the URL
+            await page.goto(f"{args.base}/ui/?token={token}")
+            await page.wait_for_timeout(500)
         for name, frag, _ in views:
             await page.goto(f"{args.base}/ui/{frag}")
             await page.wait_for_timeout(2500)
             path = OUT / f"dashboard_{name}.png"
             await page.screenshot(path=str(path), full_page=name not in ("events",) and not name.startswith("trace_"))
             print("wrote", path.relative_to(OUT.parent.parent))
-        await page.goto(f"{args.base}/reports/summary")
+        await page.goto(f"{args.base}/reports/summary" + (f"?token={token}" if token else ""))
         await page.wait_for_timeout(800)
         await page.screenshot(path=str(OUT / "report_summary.png"), full_page=True)
         print("wrote presentation/assets/report_summary.png")

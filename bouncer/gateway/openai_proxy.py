@@ -105,6 +105,20 @@ async def list_models(request: Request) -> Any:
     return {"object": "list", "data": [{"id": m, "object": "model", "owned_by": "bouncer"} for m in principal.models if m in policy.doc.models]}
 
 
+@router.get("/v1/approvals/{approval_id}")
+async def own_approval_status(request: Request, approval_id: str) -> Any:
+    """Lets an agent poll the status of its own approval request with its own key. Deciding an approval
+    is only possible through the admin API (dashboard), never with an agent key."""
+    g = gw(request)
+    principal = authenticate(g, request)
+    if principal is None:
+        return unauthorized(g, "approvals.status")
+    for appr in g.store.list_approvals():
+        if appr.id == approval_id and appr.principal == principal.id:
+            return {"id": appr.id, "status": appr.status, "tool": appr.tool, "expires_at": appr.expires_at, "allow_until": appr.allow_until}
+    return JSONResponse(error_body("approvals.not_found", f"No approval {approval_id} for {principal.id}.", None, etype="not_found"), status_code=404)
+
+
 def authenticate(g: GatewayState, request: Request) -> Principal | None:
     return g.policies.current.principal_for_key(bearer(request))
 

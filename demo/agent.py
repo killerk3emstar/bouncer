@@ -149,16 +149,17 @@ def _parse_block(exc: APIStatusError) -> tuple[str | None, str, str | None, str 
     return err.get("code"), err.get("message", str(exc)), trace_id, err.get("approval_id")
 
 
-def _wait_for_approval(approval_id: str | None, base_url: str, verbose: bool) -> bool:
-    """Poll the gateway until the approval is granted. Returns True if approved."""
+def _wait_for_approval(approval_id: str | None, base_url: str, verbose: bool, api_key: str | None = None) -> bool:
+    """Poll the gateway until the approval is granted (GET /v1/approvals/{id} with the agent's own key;
+    an agent can see the status of its own request but cannot decide it). Returns True if approved."""
     if not approval_id:
         return False
-    api_base = base_url.rsplit("/v1", 1)[0]
     deadline = time.monotonic() + APPROVAL_TIMEOUT_SECONDS
-    with httpx.Client(base_url=api_base, timeout=10.0) as client:
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    with httpx.Client(base_url=base_url, timeout=10.0, headers=headers) as client:
         while time.monotonic() < deadline:
             try:
-                resp = client.get(f"/api/approvals/{approval_id}")
+                resp = client.get(f"/approvals/{approval_id}")
                 if resp.status_code == 200 and resp.json().get("status") == "approved":
                     return True
             except httpx.HTTPError:
@@ -198,7 +199,7 @@ def run_chat(
             if is_approval and wait_approval:
                 if verbose:
                     print(f"           polling for approval {approval_id} ...")
-                if _wait_for_approval(approval_id, base_url, verbose):
+                if _wait_for_approval(approval_id, base_url, verbose, api_key=client.api_key):
                     if verbose:
                         print("           approved; retrying the call")
                     continue

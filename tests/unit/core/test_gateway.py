@@ -266,3 +266,38 @@ def test_stream_final_chunk_carries_final_decision(env) -> None:  # noqa: ANN001
     assert "secrets.aws-access-key-id" in finals[-1]["bouncer"]["findings"]
     text, _ = _stream_text(r.text)
     assert "AKIAIOSFODNN7EXAMPLE" not in text
+
+
+def test_admin_api_requires_token_and_agent_keys_do_not_work(tmp_path: Path) -> None:
+    os.environ["BOUNCER_KEY_OPS_COPILOT"] = KEY
+    app = create_app(
+        Settings(policy_path="policy/bouncer.yaml", audit_path=str(tmp_path / "a.jsonl"), t1="fake", judge_override="fake", watch=False, admin_token="adm_test_token"),
+        upstream_transport=httpx.ASGITransport(app=create_mock(MockState())),
+    )
+
+    async def get(path: str, token: str | None) -> httpx.Response:
+        h = {"Authorization": f"Bearer {token}"} if token else {}
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.get(path, headers=h)
+
+    assert asyncio.run(get("/api/approvals", None)).status_code == 401
+    assert asyncio.run(get("/api/approvals", KEY)).status_code == 401  # an agent key is not an admin token
+    assert asyncio.run(get("/api/approvals", "adm_test_token")).status_code == 200
+    assert asyncio.run(get("/healthz", None)).status_code == 200
+
+
+def test_agent_can_poll_only_its_own_approval(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    os.environ["BOUNCER_KEY_PLAYGROUND"] = "bk_test_gateway_pg"
+    mock.script([{"tool_calls": [{"name": "payments__create_transfer", "arguments": {"from_account": "A", "to_iban": "PL61109010140000071219812874", "amount": 5000, "currency": "PLN", "title": "x"}}]}])
+    r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Pay invoice 5000 PLN"}]}))
+    appr = r.json()["error"]["approval_id"]
+    assert appr
+
+    async def get(key: str) -> httpx.Response:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.get(f"/v1/approvals/{appr}", headers={"Authorization": f"Bearer {key}"})
+
+    own = asyncio.run(get(KEY))
+    assert own.status_code == 200 and own.json()["status"] == "pending"
+    assert asyncio.run(get("bk_test_gateway_pg")).status_code == 404  # another agent cannot see it

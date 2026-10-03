@@ -42,7 +42,17 @@ def judge_is_up(url: str = "http://localhost:8701/health") -> bool:
 
 def main() -> int:
     os.chdir(ROOT)
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(ROOT / ".env", override=False)
+    except ImportError:
+        pass
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONPATH": str(ROOT)}
+    if not env.get("BOUNCER_ADMIN_TOKEN"):
+        import secrets
+
+        env["BOUNCER_ADMIN_TOKEN"] = "adm_" + secrets.token_urlsafe(18)
     if "BOUNCER_JUDGE" not in env and not judge_is_up():
         # Without a judge every escalation would fail closed (blocked). For a first run we use the
         # deterministic stand-in and say so; `make judge` starts the real one.
@@ -58,7 +68,10 @@ def main() -> int:
         procs.append((name, p))
         threading.Thread(target=pump, args=(name, p), daemon=True).start()
         print(f"[dev] {name} on :{port} (pid {p.pid})")
-    print("[dev] dashboard: http://localhost:8700/ui/   Ctrl-C stops everything")
+    token = env.get("BOUNCER_ADMIN_TOKEN", "")
+    link = "http://localhost:8700/ui/" + ("" if token.lower() == "off" else f"?token={token}")
+    print(f"[dev] dashboard (admin token included, the page stores it): {link}")
+    print("[dev] Ctrl-C stops everything")
 
     def stop(*_: object) -> None:
         for _, p in procs:

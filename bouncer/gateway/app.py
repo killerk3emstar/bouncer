@@ -131,8 +131,11 @@ def create_app(
         token = settings.admin_token
         path = request.url.path
         if token and (path.startswith("/api/") or path.startswith("/admin/") or path.startswith("/reports/")):
+            import hmac
+
             auth = request.headers.get("authorization", "")
-            if auth != f"Bearer {token}" and request.query_params.get("token") != token:
+            given = auth[7:].strip() if auth.lower().startswith("bearer ") else (request.query_params.get("token") or "")
+            if not hmac.compare_digest(given.encode(), token.encode()):
                 return JSONResponse({"error": {"type": "unauthorized", "message": "Admin token required (Authorization: Bearer <BOUNCER_ADMIN_TOKEN>)."}}, status_code=401)
         return await call_next(request)
 

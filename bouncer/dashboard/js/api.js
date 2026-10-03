@@ -15,6 +15,17 @@ const TOKEN_KEY = 'adminToken';
 export const getToken = () => store.get(TOKEN_KEY);
 export const setToken = (t) => store.set(TOKEN_KEY, t || null);
 
+// `make dev` prints /ui/?token=...: store the token and remove it from the address bar and history.
+{
+  const urlToken = new URLSearchParams(location.search).get('token');
+  if (urlToken) {
+    setToken(urlToken);
+    const clean = new URL(location.href);
+    clean.searchParams.delete('token');
+    history.replaceState(null, '', clean.pathname + clean.search + clean.hash);
+  }
+}
+
 let tokenPrompt = null;
 // Asks for the admin token once, even when several requests get 401 at the same time.
 export function promptToken(reason) {

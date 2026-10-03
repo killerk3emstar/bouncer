@@ -39,9 +39,28 @@ class Settings:
             t1=os.environ.get("BOUNCER_T1", "auto"),
             t1_model_path=os.environ.get("T1_MODEL_PATH", "models/deberta-pi-v2/onnx"),
             judge_override=os.environ.get("BOUNCER_JUDGE") or None,
-            admin_token=os.environ.get("BOUNCER_ADMIN_TOKEN") or None,
+            admin_token=_admin_token_from_env(),
             watch=os.environ.get("BOUNCER_WATCH", "1") != "0",
         )
+
+
+def _admin_token_from_env() -> str | None:
+    """The admin API (/api, /admin, /reports) always needs a token, unless explicitly turned off.
+
+    Unset: a random token is generated for this process and logged once (make dev prints a dashboard
+    link that carries it). "off": no token (only for a gateway that nothing else on the host can reach)."""
+    import secrets as _secrets
+
+    value = os.environ.get("BOUNCER_ADMIN_TOKEN", "").strip()
+    if value.lower() == "off":
+        log.warning("BOUNCER_ADMIN_TOKEN=off: the admin API is open to anyone who can reach this port")
+        return None
+    if value:
+        return value
+    token = "adm_" + _secrets.token_urlsafe(18)
+    os.environ["BOUNCER_ADMIN_TOKEN"] = token
+    log.warning("BOUNCER_ADMIN_TOKEN not set; generated one for this run. Dashboard: http://localhost:%s/ui/?token=%s", os.environ.get("BOUNCER_PORT", "8700"), token)
+    return token
 
 
 class JudgeAdapter:
