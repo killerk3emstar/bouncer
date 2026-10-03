@@ -1,7 +1,8 @@
 # Bank Ops Copilot demo
 
-A small, deterministic demo for Bouncer: an agent that looks up customers, searches an
-internal knowledge base, reads vendor pages, sends e-mail and creates transfers, with every
+A small, deterministic demo for Bouncer: an agent that looks up customers, searches and writes to an
+internal knowledge base, reads vendor pages, sends e-mail, creates transfers and (for the developer
+assistant) asks to run Python, which is never executed, with every
 model call, tool call and tool result flowing through the Bouncer gateway. All data is fake
 and all side effects are simulated.
 
@@ -13,10 +14,10 @@ and all side effects are simulated.
 | `tools.py` | Tool implementations and OpenAI tool JSON schemas. No network, no side effects. |
 | `naming.py` | Policy name (`crm.lookup_customer`) <-> OpenAI wire name (`crm__lookup_customer`). No deps; the gateway can import it. |
 | `web/vendor.example/` | Static pages served by `web.fetch` (offline). Some carry indirect prompt injections. |
-| `scenarios/*.yaml` | Scripted demo runs for PLAN.md section 9 scenarios 1-8. |
+| `scenarios/*.yaml` | 12 scripted demo runs (PLAN.md section 9 scenarios 1-8, with variants 3b-3e). |
 | `scenario.py` | Loader and schema validation for the scenario files. |
 | `agent.py` | The Bank Ops Copilot CLI (OpenAI SDK -> Bouncer). Scripted and live modes. |
-| `mock_upstream.py` | Simulated OpenAI upstream (owned by the lead). Scripted replies + request log. |
+| `mock_upstream.py` | Simulated OpenAI upstream. Scripted replies + request log. |
 | `mcp_server.py` | The same tools as an MCP server (demo-bank, :8703) with a tool-poisoning toggle. |
 
 ## Tool names on the wire
@@ -37,8 +38,8 @@ names unchanged.
 
 ## Running the demo
 
-Prerequisites: the gateway on :8700 and the mock upstream on :8702 (the lead's `make dev`),
-and the API keys from `.env` exported (`make setup` copies `.env.example`).
+Prerequisites: the gateway on :8700 and the mock upstream on :8702 (`make dev`), and the agent
+keys in `.env` (`make setup` copies `.env.example`; the agent reads `.env` itself).
 
 ```
 # one scripted scenario (deterministic, no real LLM)
@@ -68,18 +69,18 @@ A Bouncer block arrives as HTTP 403 (or 429 for budgets/limits) with an OpenAI-s
 ```
 
 The agent prints the message and stops; with `--wait-approval` it polls
-`GET {gateway}/api/approvals/{id}` until `{"status": "approved"}` and retries the same call.
+`GET {gateway}/v1/approvals/{id}` with its own agent key until `{"status": "approved"}` and retries the
+same call. The agent can only read the status of its own request; a human decides it in the dashboard.
 
 ## Mock upstream contract (scripted mode)
 
-The agent drives the mock upstream (owned by the lead, `demo/mock_upstream.py`). Verified
-against the current implementation:
+The agent drives the mock upstream (`demo/mock_upstream.py`):
 
 - `POST /mock/reset` - clear the queue and the request log.
 - `POST /mock/script` body `{"responses": [...], "replace": false}` - append scripted replies
   to a FIFO queue consumed by subsequent `/v1/chat/completions` calls.
-- `GET /mock/requests?limit=N` - returns `{"count": N, "requests": [...]}` (the raw request
-  bodies, used by tests and the scenario runner to prove a secret never reached the model).
+- `GET /mock/requests?limit=N` - returns `{"count": <requests recorded>, "requests": [the last N]}` (the
+  raw request bodies, used by tests and the scenario runner to prove a secret never reached the model).
 
 Each scripted response item is one of:
 
@@ -110,7 +111,7 @@ hot-reload case: with the default policy the customer e-mail is redacted; after 
 uv run python -m demo.mcp_server          # demo-bank, streamable HTTP on 127.0.0.1:8703/mcp
 ```
 
-The server exposes the six tools over MCP with their dotted names. A toggle swaps the
+The server exposes the seven demo tools over MCP with their dotted names. A toggle swaps the
 description of `kb.search` for a poisoned one (an `<IMPORTANT>` block instructing the model to
 read `~/.ssh/id_rsa` and smuggle it through a parameter, in the style of the Invariant Labs
 tool-poisoning write-up, April 2025). The description is rewritten in `on_list_tools`

@@ -90,6 +90,7 @@ def test_case_live(case: dict[str, Any], live: LiveStack, record_property) -> No
             api_key=step.get("api_key"),
             auth=step.get("auth", True),
             mock_response=step.get("mock_response"),
+            extra_headers=step.get("headers"),
         )
         record_latency(f"{case['id']}{' ' + label.strip(': ') if label else ''}", res)
         fids = res.finding_ids

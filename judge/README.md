@@ -55,8 +55,9 @@ head and tail of a long UNTRUSTED_CONTENT, so a "no" is weaker evidence.
 Errors: `{"error": {"type": "judge_error", "code": ..., "message": ...}}` with 422 `invalid_questions`,
 413 `state_too_large`, 503 `loading` / `backend_unavailable` / `busy`, 502 `backend_error`.
 
-`GET /health`: `status` (`loading` | `ok` | `error`), `backend`, `model`, `loaded`, `load_ms`, `warmup_ms`,
-`queue`, `served`, `failed`, `latency_ms_p50`, `latency_ms_p95`, `info` (Clef: `peak_memory_mb`, `active_memory_mb`).
+`GET /health`: `status` (`loading` | `ok` | `error`), `backend`, `model`, `loaded`, `load_ms`, `warmup_ms`, `error`,
+`queue`, `served`, `failed`, `latency_ms_p50`, `latency_ms_p95`, `info` (Clef: `path`, `max_tokens`, `load_ms`,
+`peak_memory_mb`, `active_memory_mb`). HTTP 503 when `status` is `error`.
 
 ## Client for the gateway
 

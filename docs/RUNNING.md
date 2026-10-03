@@ -25,13 +25,16 @@ make test       # offline test suite
 make dev        # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704
 ```
 
-Then open the dashboard at <http://localhost:8700/ui/> and, in a second terminal:
+Then open the dashboard link that `make dev` prints (`http://localhost:8700/ui/?token=...`; the dashboard stores
+the admin token and removes it from the address bar) and, in a second terminal:
 
 ```
 make demo       # Bank Ops Copilot: scripted scenarios through the gateway, pass/fail table
 ```
 
-`make dev` runs in the foreground; Ctrl-C stops all four services.
+`make dev` runs in the foreground; Ctrl-C stops all four services. It reads `.env`, generates a random admin token
+when `BOUNCER_ADMIN_TOKEN` is empty, and, when no judge answers on :8701, starts the gateway with the deterministic
+judge stand-in (`BOUNCER_JUDGE=fake`) and prints that it did. Start `make judge` first for the real judge.
 
 ## Commands
 
@@ -43,9 +46,10 @@ make demo       # Bank Ops Copilot: scripted scenarios through the gateway, pass
 | `make dev` | gateway, simulated upstream, demo MCP server, feed server | nothing else |
 | `make judge` | T2 judge service on :8701. Default backend Clef MLX (Apple Silicon); `JUDGE_BACKEND=ollama-guard make judge` elsewhere | `make models` |
 | `make judge-fake` | judge service with the deterministic keyword backend (no model) | nothing else |
-| `make demo` | scripted Bank Ops Copilot scenarios against the running stack | `make dev` |
+| `make demo` | scripted Bank Ops Copilot scenarios against the running stack (agent keys from `.env`) | `make dev` |
 | `make test-live` | the YAML cases and AI-layer checks over real HTTP against the running stack (`tests/live/`) | `make dev`; `make judge` for the T2 checks |
-| `make eval` | detection quality per layer, `reports/eval.md` | T1 model for the T1 rows |
+| `make eval` | detection quality of T0 and T1 on `bank_ops` and `deepset_test`, `reports/eval_quick.md` | T1 model (`make models`) |
+| `make eval-full` | the same plus the full pipeline with the T2 judge, `reports/eval_layers.md` | T1 model, `make judge` |
 | `make bench` | gateway latency overhead and throughput, `reports/bench.md` | nothing else (uses the T1 model when present) |
 | `make verify-audit` | checks the audit log hash chain (`AUDIT=path` to pick a file) | an audit log |
 | `make sign-feed` | signs `signatures/feed.json`; creates a dev key in `data/` on first use | nothing else |
@@ -55,8 +59,9 @@ make demo       # Bank Ops Copilot: scripted scenarios through the gateway, pass
 
 `make test` runs `pytest -m "not live"`: every YAML case in `tests/cases/` goes through the real gateway
 app in-process, with the simulated upstream mounted as a transport, the deterministic fake T1 classifier
-and the scriptable fake judge, plus the unit tests. Measured: 1,055 tests in 10.9 s wall time (pytest
-reports 9.8 s) on the machine above; the test count grows as cases are added. Reports:
+and the scriptable fake judge, plus the unit tests. Measured: 1,097 tests in about 12 s wall time (pytest
+reports 10 to 11 s) on the machine above; on two fresh clones the first run took 15 and 19 s wall time
+(13 and 16 s pytest) while Python compiled the modules. The test count grows as cases are added. Reports:
 
 - `reports/tests/summary.md` and `summary.json`: pass/fail per control, allow and block case counts,
 - `reports/tests/junit.xml`: JUnit XML for CI,
@@ -82,13 +87,16 @@ not answer. Two parts:
 At the end the session prints per-layer latency (T0, T1, T2, upstream, gateway overhead), the highest T1
 score, the judge call and the findings for every request.
 
-Measured against `make dev` with the Clef judge (`make judge`): the five AI-layer checks passed in 2.95 s.
-The English injection was escalated by T1 (score 1.0) and blocked by the judge (T2 1,147 ms); the Polish
-injection and the benign Polish prompt went to the judge as non-English text (675 ms and 661 ms) and were
-blocked and allowed respectively; the benign English prompt cost 9.4 ms of T1.
+Measured against the running stack with the real T1 and the Clef judge (`reports/tests/summary_live.md`,
+2026-10-04 01:16): 358 passed, 75 skipped, 0 failed in 21 s. An earlier run of the five AI-layer checks alone
+(session output, not saved in `reports/`) passed in 2.95 s: the English injection was escalated by T1 (score 1.0)
+and blocked by the judge (T2 1,147 ms); the Polish injection and the benign Polish prompt went to the judge as
+non-English text (675 ms and 661 ms) and were blocked and allowed respectively; the benign English prompt cost
+9.4 ms of T1.
 
 Settings: `BOUNCER_URL` (default `http://localhost:8700`), `MOCK_URL` (default `http://localhost:8702`),
-`BOUNCER_ADMIN_TOKEN` when the admin API is protected, agent keys from the environment or `.env`.
+`BOUNCER_ADMIN_TOKEN` (the gateway's admin token: the value in `.env`, or the one in the dashboard link that
+`make dev` prints), agent keys from the environment or `.env`.
 
 ### make bench
 
@@ -128,8 +136,9 @@ in the environment win).
 | `BOUNCER_AUDIT_FSYNC` | off | gateway | `1` = fsync after every audit line |
 | `BOUNCER_T1` | `auto` | gateway | `auto` (ONNX when `T1_MODEL_PATH/model.onnx` exists, else the fake classifier), `onnx`, `fake`, `off` |
 | `T1_MODEL_PATH` | `models/deberta-pi-v2/onnx` | gateway | T1 model directory |
+| `T1_CONCURRENCY` | `3` | gateway | T1 inferences that may run at the same time (one shared ONNX session) |
 | `BOUNCER_JUDGE` | unset (policy `judge.backend`) | gateway | force a judge backend: `fake` (in-process, no model), `none`, or a remote backend name |
-| `BOUNCER_ADMIN_TOKEN` | unset (admin API open on localhost) | gateway, live tests | when set, `/api/*`, `/admin/*` and `/reports/*` need `Authorization: Bearer <token>` |
+| `BOUNCER_ADMIN_TOKEN` | empty: a random token per run (logged by the gateway; `make dev` prints a dashboard link with it) | gateway, `make dev`, live tests | `/api/*`, `/admin/*` and `/reports/*` need `Authorization: Bearer <token>`; agent keys are not accepted there. `off` disables the check (unsafe on a host that agents share) |
 | `BOUNCER_WATCH` | `1` | gateway | `0` disables policy hot reload and feed refresh |
 | `BOUNCER_LOG_LEVEL` | `INFO` | gateway | Python log level |
 | `BOUNCER_MCP_UPSTREAM` | `http://127.0.0.1:8703/mcp` | gateway | MCP server behind the `/mcp` gateway |
@@ -137,11 +146,13 @@ in the environment win).
 | `JUDGE_BACKEND` | `clef-mlx` | judge | `clef-mlx`, `ollama-guard`, `fake` |
 | `JUDGE_HOST` / `JUDGE_PORT` | `127.0.0.1` / `8701` | judge | listen address |
 | `CLEF_MLX_PATH` | `models/clef-flash-mlx-4bit` | judge | Clef model directory |
-| `JUDGE_MAX_TOKENS`, `JUDGE_MAX_QUEUE` | `8192`, `16` | judge | input token budget per decision, queued requests before 503 |
+| `JUDGE_MAX_TOKENS`, `JUDGE_MAX_QUEUE` | `1536`, `16` | judge | prompt token cap per decision for Clef (longer untrusted content is cut in the middle), queued requests before 503 |
 | `OLLAMA_URL`, `OLLAMA_GUARD_MODEL` | `http://localhost:11434`, `llama-guard3:1b` | judge (`ollama-guard`) | Ollama endpoint and model |
 | `MOCK_PORT` | `8702` | simulated upstream | listen port |
+| `MCP_HOST`, `MCP_PORT` | `127.0.0.1`, `8703` | demo MCP server | listen address |
 | `DEMO_MCP_POISON`, `DEMO_MCP_FLAG` | `0`, `data/mcp_poison.flag` | demo MCP server | start with the poisoned tool description / flag file that toggles it |
 | `BOUNCER_URL`, `MOCK_URL` | `http://localhost:8700` (`/v1` for the demo agent), `http://localhost:8702` | demo agent, live tests | where the running stack is |
+| `BOUNCER_MCP_URL`, `DEMO_MCP_ADMIN_URL` | the gateway's `/mcp`, `http://127.0.0.1:8703` | demo agent (`s8`) | MCP gateway URL and the demo MCP server's poison toggle |
 | `LIVE_MOCKED_UPSTREAMS`, `LIVE_TIMEOUT_S` | detected from the policy, `30` | live tests | upstream names that point at the mock; per-request timeout |
 | `BENCH_GATEWAY_PORT`, `BENCH_MOCK_PORT` | `8705`, `8706` | `scripts/bench.py` | benchmark ports |
 
@@ -159,7 +170,8 @@ docker compose down                   # add -v to delete the audit log volume
 ```
 
 Measured: first `docker compose build` 82 s including base image download, runtime image 729 MB;
-`docker compose run --rm tests` ran 1,061 tests in 9.3 s (pytest time) in a container with `network_mode: none`.
+`docker compose run --rm tests` ran 1,061 tests (the count at the time) in 9.3 s (pytest time) in a container
+with `network_mode: none`.
 
 How the container stack differs from `make dev`:
 
@@ -186,6 +198,8 @@ How the container stack differs from `make dev`:
 - **Audit log** lives in the named volume `bouncer-data` (`/app/data`). Verify it with
   `docker compose exec gateway python scripts/verify_audit.py data/audit.jsonl`, or export it from the dashboard.
 - **Keys** come from `./.env` when present (`make setup`), otherwise the dev keys from `.env.example`.
+- **Admin token**: `BOUNCER_ADMIN_TOKEN` from `./.env` or the shell; when it is empty the gateway generates one at
+  start and logs it with a dashboard link (`docker compose logs gateway | grep BOUNCER_ADMIN_TOKEN`).
 - **Ports** bind to 127.0.0.1. Change the host side with `BOUNCER_HOST_PORT`, `MOCK_HOST_PORT`,
   `MCP_HOST_PORT`, `FEED_HOST_PORT`, `JUDGE_HOST_PORT`, `REDIS_HOST_PORT`.
 - **Redis** (`--profile redis`, :6390) is provided for the multi-replica design; this build keeps budget
@@ -208,21 +222,24 @@ on other ports (`BOUNCER_PORT=8710 make gateway`, `MOCK_PORT=8712 make mock`; po
 
 **Model files missing.** With `BOUNCER_T1=auto` (the default) and no `models/deberta-pi-v2/onnx/model.onnx`,
 the gateway silently uses the deterministic fake T1 classifier: everything runs, but T1 scores come from
-keyword rules. `BOUNCER_T1=onnx` with missing files logs `T1 classifier unavailable` and runs without T1.
+keyword rules. `BOUNCER_T1=onnx` with missing files does not fall back: the first T1 call fails, and every request
+that reaches T1 follows `defaults.fail_mode` (with `closed`, the default, it is blocked with
+`prompt_injection.control_error`, and the message names the missing file).
 Fix: `make models`. A judge that cannot load its model says so in `GET :8701/health`.
 
 **Judge down or slow.** Requests that escalate to T2 (T1 grey zone, non-English text, side-effect tool calls)
 follow `defaults.fail_mode` in the policy: `closed` (default) blocks them with a finding such as
 `prompt_injection.judge_unavailable` or `tool_governance.judge_unavailable`; `open` lets them through and
 logs the finding. `GET /api/policy` shows the judge's health (`judge.healthy`, `judge.health`). Start a judge (`make judge`,
-`JUDGE_BACKEND=ollama-guard make judge`, `make judge-fake`), or run the gateway with `BOUNCER_JUDGE=fake`.
+`JUDGE_BACKEND=ollama-guard make judge`, `make judge-fake`), or run the gateway with `BOUNCER_JUDGE=fake`
+(`make dev` does that by itself when no judge answers at start; a judge that goes down later is not replaced).
 With the real T1, non-English prompts and many prompts that contain configuration or secrets reach the
 judge, so a stack without a judge blocks noticeably more: in a measured `make test-live` run against the
 Docker stack without a judge, 64 of 353 executed tests failed for this reason alone.
 
 **`make test-live` skips everything.** The gateway is not reachable at `BOUNCER_URL`; start `make dev` (or
-the compose stack) or point `BOUNCER_URL` / `MOCK_URL` at it. With `BOUNCER_ADMIN_TOKEN` set on the gateway,
-export the same token for the tests.
+the compose stack) or point `BOUNCER_URL` / `MOCK_URL` at it. Export the gateway's admin token as
+`BOUNCER_ADMIN_TOKEN` for the tests (or set it in `.env` before `make dev`).
 
 **Policy change has no effect.** Check the dashboard (Policy, version history) or `GET /api/policy`: a rejected
 file shows the error and line, and the previous version stays active. `BOUNCER_WATCH=0` turns hot reload off;

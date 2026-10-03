@@ -13,27 +13,36 @@ in the dashboard at `GET /api/signatures`.
 |---|---|---|
 | `feed.json` | yes | the signatures (see format below) |
 | `feed.json.sig` | yes | ed25519 signature over the exact bytes of `feed.json`, base64 |
-| `feed.pub` | yes | ed25519 public key, base64; pinned in the policy (`controls.signatures.public_key`) |
-| `../data/feed_signing.key` | no (gitignored) | ed25519 private seed, base64, chmod 600; demo key only |
+| `feed.pub` | yes | ed25519 public key, base64; the policy names this file (`controls.signatures.public_key`) |
+| `../data/feed_signing.key` | no (gitignored) | ed25519 private seed, base64, chmod 600; demo key only, exists only on the machine that signed the feed |
 
 ## Trust model
 
 The feed is itself a supply-chain target: anyone who can replace `feed.json` could disable a control
-or whitelist an attack. So Bouncer verifies an ed25519 signature over the exact feed bytes against a
-public key pinned in the policy, and **rejects** a feed that is missing, unsigned, tampered or
-malformed — the previous good version keeps protecting traffic and the dashboard shows `last_error`.
+or whitelist an attack. So Bouncer verifies an ed25519 signature over the exact feed bytes against the
+public key in the file that the policy names (`controls.signatures.public_key`), and **rejects** a feed
+that is missing, unsigned, tampered or malformed, or older than the active one (a lower `version` of the
+same feed, even with a valid signature, would silently remove newer signatures); the previous good version
+keeps protecting traffic and the dashboard shows `last_error`.
+
+The policy names the key file; it does not contain the key or its fingerprint. Whoever can write both
+`feed.json` and `feed.pub` can re-sign the feed, so `signatures/` needs the same write protection as the
+policy (the Docker stack mounts it read-only). The dashboard (`GET /api/signatures`,
+`public_key_fingerprint`) shows the fingerprint of the key in use, so a reviewer can compare it.
 
 - **In production** the private key lives with the feed publisher (CI signing step or an HSM), never
-  in the repo. The gateway only ever holds the public key, pinned in `policy/bouncer.yaml`. A feed
-  can then be served from a read-only URL (CDN, object store); see `scripts/feed_server.py` for the
-  local demo of a remote feed URL.
-- **In this repo** `data/feed_signing.key` is a throwaway demo key so the shipped feed is validly
-  signed out of the box and the jury can re-sign after editing. It is gitignored. Treat it as public;
-  do not reuse it anywhere real.
+  in the repo. The gateway only ever holds the public key. A feed can then be served from a read-only
+  URL (CDN, object store); see `scripts/feed_server.py` for the local demo of a remote feed URL.
+- **In this repo** the shipped `feed.json` is validly signed (`feed.json.sig` and `feed.pub` are
+  committed). The private key, `data/feed_signing.key`, is a throwaway demo key that is gitignored, so it
+  exists only on the machine that signed the feed. On a fresh clone, `make sign-feed` generates a new key
+  pair and rewrites `feed.pub`, so you can edit and re-sign the feed. Treat any such key as public; do not
+  reuse it anywhere real.
 
 Rotating the key: delete `data/feed_signing.key`, run `make sign-feed` (or
 `uv run python scripts/sign_feed.py`). A new key pair is generated, `feed.pub` is rewritten, and the
-script prints the new fingerprint — pin it in the policy.
+script prints the new fingerprint. The gateway reads the key file each time it loads a changed
+`feed.json`; an unchanged feed that was verified with the old key stays active.
 
 ## Signing and refresh
 

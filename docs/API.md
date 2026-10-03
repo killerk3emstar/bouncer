@@ -2,9 +2,76 @@
 
 Contract between the gateway (FastAPI) and the static dashboard in `bouncer/dashboard/`.
 Every example below matches the fixture files in `bouncer/dashboard/fixtures/` (trimmed where marked with `...`).
-If the backend returns exactly these shapes, the dashboard works without changes.
+This contract was written before the backend. The backend in this repository follows it for every endpoint
+the dashboard uses, but differs in the details listed in section 0; read that section before relying on a
+field.
 
-Contents: 1 Conventions · 2 Serving the dashboard · 3 Audit event · 4 Endpoints · 5 Export formats · 6 How to compute derived numbers · 7 Fixture mode · 8 Notes for the backend
+Contents: 0 Differences in this build · 1 Conventions · 2 Serving the dashboard · 3 Audit event · 4 Endpoints · 5 Export formats · 6 How to compute derived numbers · 7 Fixture mode · 8 Notes for the backend
+
+---
+
+## 0. Differences in this build
+
+Checked on 2026-10-04 against `bouncer/gateway/admin_api.py`, `bouncer/pipeline.py`, `bouncer/audit.py` and the GET
+endpoints of a running gateway.
+
+Not implemented as specified here (open items):
+
+- **Approvals.** Deciding an approval that is no longer pending returns 200 with the unchanged approval (no 409)
+  and writes another `approval.decided` event. An invalid `decision` returns 400, not 422. `decided_by` is
+  `dashboard`. `status` can also be `used` (the approved call went through once).
+- **Exports.** `from` and `to` are ignored; the export reads the in-memory buffer of the last 5000 events, not the
+  whole file. The file name is `bouncer-audit.jsonl` / `bouncer-audit.csv`. The CSV has 16 columns:
+  `ts,seq,trace_id,principal,team,session_id,route,direction,model,action,findings,latency_ms_total,cost_usd,policy_version,excerpt,hash`
+  (the dashboard's fixture exporter still writes the 26 columns of section 5). Cells that start with `=`, `+`,
+  `-`, `@`, tab or carriage return get a leading `'` so a spreadsheet does not run them as formulas.
+- **Self-test.** No 409 for a second concurrent run; `report_url` is always `null`; `by_control` lists only
+  controls that have cases.
+- **System events.** `feed.updated` and `feed.rejected` are not written. `/api/events` and the SSE stream return
+  decision events only. `approval.decided` carries the trace id of the held request and the agent as `principal`.
+- **Playground.** `tool_name` is not supported; the simulated tool call is always `web.fetch`.
+- **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_action` (not `side_effect_tool`;
+  `monitor_async` is never emitted). The dashboard labels only `side_effect_tool`, so it shows the raw key.
+- **Budgets.** `state` is `ok`, `warning` or `exceeded`; the dashboard styles `downgraded` and `blocked`.
+- **ATLAS ids.** Findings of `tool_governance`, `budgets`, `loops`, `mcp_pinning` and `auth` carry no ATLAS id;
+  `AML.T0053` and `AML.T0010` appear only in the fixtures.
+- **Errors.** Most error bodies have no `code`. Request validation errors from FastAPI are 422 with
+  `{"detail": [...]}`.
+- **Latency.** `/api/controls` and `/api/coverage` took 160 to 190 ms (they re-read the YAML cases on every call);
+  the other GET endpoints 1 to 12 ms.
+
+Shapes that differ from the examples below (the dashboard handles them):
+
+- Audit event: `tool` is the tool name as a string; the masked arguments are in `tool_calls[]`
+  (`{tool, wire_name, call_hash, arguments, findings}`). Extra keys: `t1` (T1 scores per segment),
+  `downgraded_from`, `notes`, and `mcp` on MCP events. Findings also carry `id`, `effective_action`, `monitor`,
+  `message`, `direction`, `source` and `view`. `judge` is `{"invoked": false}` when T2 did not run; `usage` is `{}`
+  when nothing was billed; `upstream` is `null` for MCP events (the server is in `mcp.server`). Delegated requests
+  have `principal.via`.
+- `/api/events/{trace_id}` returns the last event of the trace from the in-memory buffer; `chain_ok` checks that
+  event against its `prev_hash`.
+- Block messages name the rule, the reason and the next step but do not end with the trace id; the trace id is in
+  the `trace_id` field of the error body and in the `X-Bouncer-Trace-Id` header.
+- SSE: an initial `: connected` comment, then `: keepalive` after 15 s without events.
+- `/api/stats` and `/api/perf`: always 24 buckets of window/24 seconds; `top_controls` / `top_owasp` up to 10 rows
+  and counted per finding; an extra `total` latency layer; ratios are `0.0`, not `null`, without samples; `/api/perf`
+  uses one set of histogram edges for every layer.
+- `/api/controls`: a disabled control keeps `mode` from `defaults.mode`; list settings are JSON arrays; `tests`
+  counts are `null` until a self-test has run in this process.
+- `/api/coverage`: a cell's `tests` is the number of YAML cases of that control (not per risk); a control with no
+  cases gives a `partial` cell; failing tests do not change the status.
+- `/api/policy/versions`: `diff` is `null` for the first load; `summary` shows the first added lines.
+- `/api/signatures`: `loaded_at` and `last_check` are Unix seconds; no `hits_24h` or `last_error_at`; the key
+  fingerprint has 16 hex characters; `targets` use the feed names (`tool_args`, not `tool_call`).
+- `/api/scenarios`: ids are `s1-customer-lookup`, `s2-env-secrets`, `s3-indirect-injection-trifecta`,
+  `s3b-ascii-smuggling`, `s3c-markdown-exfiltration`, `s3d-polish-injection`, `s3e-trifecta-approval`,
+  `s4-tool-loop`, `s5-team-budget`, `s6-pickle-exploit`, `s7-policy-change-email`, `s8-mcp-rug-pull`;
+  `expected_action` holds the expected outcome text (for example `approval_required or blocked`); `passed` of a run
+  compares the outcome, not `final_action`.
+- Endpoints not in the table of section 4: `PUT /api/policy` and `POST /api/policy/validate` (policy editing in
+  the dashboard), `GET /api/approvals/{id}`, `GET /api/mcp/tools`, `POST /admin/policy/reload`, `GET /healthz`, and
+  for agents (agent key, not the admin token) `GET /v1/approvals/{id}`, which returns the status of the agent's own
+  approval request.
 
 ---
 
@@ -19,28 +86,27 @@ Contents: 1 Conventions · 2 Serving the dashboard · 3 Audit event · 4 Endpoin
 | Money | USD as numbers, field names end with `_usd`. |
 | Ratios | Numbers in `[0, 1]` (`escalation_rate`, `cache_hit_rate`). The dashboard formats them as percentages. |
 | Missing values | `null`, never omitted. Empty lists are `[]`. A statistic with no samples is `null` (e.g. `p50: null`). |
-| Ids | trace `tr_<ULID>`, session `ses_<hex>`, approval `apr_<hex>`, signature `SIG-0001`. |
-| Policy version | `sha256:<64 hex>` of the policy file bytes. The dashboard shows the first 12 hex characters. |
+| Ids | trace `tr_<16 hex>`, approval `apr_<8 hex>`, signature `SIG-0001`. Session ids are `<principal>/<session>`: the agent's `X-Bouncer-Session` header (up to 128 characters) or a generated id, prefixed with the calling agent so one agent cannot use another agent's session. (Fixtures use `tr_<ULID>` and `ses_<hex>`.) |
+| Policy version | `sha256:` and the first 16 hex characters of the SHA-256 of the policy file. The dashboard shows the first 12 hex characters. |
 | Actions | `allow`, `log`, `redact`, `require_approval`, `block` (weakest to strongest). The strongest finding action decides the event action. |
-| Control ids | `auth`, `budgets`, `loops`, `secrets`, `pii`, `obfuscation`, `prompt_injection`, `tool_governance`, `output_safety`, `signatures`, `supply_chain`, `mcp_pinning`, `approvals` (plus optional `harmful_content`). |
+| Control ids | `auth`, `secrets`, `pii`, `obfuscation`, `prompt_injection`, `tool_governance`, `budgets`, `loops`, `output_safety`, `signatures`, `supply_chain`, `mcp_pinning`, `approvals` (plus optional `harmful_content`), in this order (`CONTROL_CATALOG` in `bouncer/policy/compiled.py`). |
 | Finding id | `<control>.<rule>`, e.g. `secrets.aws-access-key-id`, `pii.EMAIL`, `tool_governance.lethal_trifecta`, `prompt_injection.heuristic`, `prompt_injection.classifier`, `prompt_injection.judge`, `signatures.SIG-0004`. In JSON the two parts are separate fields `control` and `rule`. |
-| Routes | `openai.chat`, `mcp.call`, `mcp.list`, `guard.check`, and `admin` for policy and feed events. |
+| Routes | `openai.chat`, `mcp.call`, `mcp.list`, `guard.check`, `playground` (dashboard Playground requests, with `principal.via: "dashboard-playground"`), and `admin` for policy events. |
 | Directions | `input`, `output`, `tool_call`, `tool_result`, `tool_definition`. |
 | Tiers | `T0` (deterministic), `T1` (classifier), `T2` (judge). |
 | Severity | `info`, `low`, `medium`, `high`, `critical`. |
 | OWASP ids | `LLM01`..`LLM10` (OWASP Top 10 for LLM Applications 2025), `ASI01`..`ASI10` (OWASP Top 10 for Agentic Applications 2026). MITRE ATLAS ids as `AML.T0051`, `AML.T0051.001`. |
 
-### Authentication (optional)
+### Authentication
 
-If the gateway is started with `BOUNCER_ADMIN_TOKEN`, every `/api/*` request must carry `Authorization: Bearer <token>`. Without it the gateway answers:
+Every request to `/api/*`, `/admin/*` and `/reports/*` must carry `Authorization: Bearer <BOUNCER_ADMIN_TOKEN>` (compared in constant time). When `BOUNCER_ADMIN_TOKEN` is unset, the gateway generates a random token for the run and logs it; `make dev` prints a dashboard link `http://localhost:8700/ui/?token=...`. Agent API keys are not admin tokens. `BOUNCER_ADMIN_TOKEN=off` turns the check off (unsafe on any host that agents share). Without a valid token the gateway answers:
 
 ```
 HTTP 401
-{"error": {"type": "unauthorized", "code": "admin.token_required",
-  "message": "Admin token required: send Authorization: Bearer <BOUNCER_ADMIN_TOKEN>."}}
+{"error": {"type": "unauthorized", "message": "Admin token required (Authorization: Bearer <BOUNCER_ADMIN_TOKEN>)."}}
 ```
 
-The dashboard then asks for the token once, stores it in `localStorage` (`bouncer.adminToken`) and retries. The SSE stream and exports are fetched with `fetch()`, so they also carry the header; no token in URLs. Without `BOUNCER_ADMIN_TOKEN` set, `/api/*` is open (local demo).
+The dashboard then asks for the token once, stores it in `localStorage` (`bouncer.adminToken`) and retries. A `?token=` in the dashboard URL is stored the same way and removed from the address bar and history. The SSE stream and exports are fetched with `fetch()`, so they also carry the header; the dashboard never puts the token into request URLs.
 
 ### Errors
 
@@ -161,7 +227,7 @@ Example (`fixtures/event_detail.json`, scenario 3 step 3):
 }
 ```
 
-The dashboard highlights `[REDACTED:<rule>#n]` and `[REMOVED:<rule>#n]` markers inside `excerpt`.
+The dashboard highlights `[REDACTED:<rule>]` markers (the form the gateway writes) and `[REMOVED:<rule>]` markers inside `excerpt`.
 
 ---
 
@@ -679,7 +745,7 @@ Request body:
 
 Errors: 404 unknown id; 409 `{"error": {"type": "conflict", "code": "approvals.not_pending", "message": "Approval apr_7f3c is already denied."}}` when not pending or expired; 422 for an invalid `decision`. `decided_by` is `admin` (no user accounts in this version).
 
-Semantics shown to the user: approval allows exactly the held call (same principal, tool and `arguments_hash`) once, within `approvals.ttl_seconds`; the agent has to send the call again.
+Semantics shown to the user: approval allows exactly the held call (same principal, session, tool and `arguments_hash`) once, within `approvals.ttl_seconds` after the decision; the agent has to send the call again, and the approval then has status `used`. The agent sees the status with its own key at `GET /v1/approvals/{id}` and cannot decide it.
 
 ### 4.14 POST /api/playground
 
@@ -815,7 +881,7 @@ ts,seq,trace_id,type,principal,team,session_id,route,direction,model,upstream,ac
 - `covered`: mapping is `full`, control enabled, `enforce`, tests pass.
 - `tests`: number of YAML cases tagged with both the control and the risk id (`owasp_llm` / `owasp_agentic` in the case).
 
-**Risk status**: `covered` if at least one cell is `covered` and the mapping does not mark the risk as only partially addressable; `partial` if the best cell is `partial` (or the risk note says only part of it is addressed); `none` if there are no cells or all cells are `none`. The fixture marks LLM04, LLM08, ASI03, ASI06, ASI08, ASI09, ASI10 as partial and LLM09, ASI07 as not covered; keep those honest gaps.
+**Risk status**: `covered` if at least one cell is `covered` and the mapping does not mark the risk as only partially addressable; `partial` if the best cell is `partial` (or the risk note says only part of it is addressed); `none` if there are no cells or all cells are `none`. The fixture marks LLM04, LLM08, ASI03, ASI06, ASI08, ASI09, ASI10 as partial and LLM09, ASI07 as not covered. The backend (`COVERAGE_MAP` in `bouncer/gateway/admin_api.py`) now marks LLM04, LLM08, ASI03, ASI07, ASI08, ASI09, ASI10 as partial and LLM09 as not covered (ASI06 is covered by the memory-write checks, ASI07 is partial through agent delegation); with the shipped policy the live posture score is 78 (12 covered, 7 partial, 1 not covered).
 
 **Posture score** = `round(100 * (covered + 0.5 * partial) / 20)`. Disabling a control or switching it to monitor lowers the score on the next request, which is what the jury will try.
 
@@ -874,5 +940,5 @@ Fixture sets: `?fixtures=empty` (no traffic, no approvals, no signatures), `?fix
 - The dashboard escapes every string it renders (excerpts, messages, tool arguments, policy text are attacker-controlled). Links are rendered only for `http(s)` URLs.
 - Never put raw secrets or PII into any field above, including `tool.arguments`, approval `arguments`, `message` and `excerpt`. The dashboard has no way to tell.
 - The block messages in fixtures follow the rule "which rule fired, why, what to do next" and end with the trace id; please keep that style in the real `message` and `block.message`.
-- Policy semantics assumed by fixture scenario 3: an injection found in a **tool result** (T1 grey zone, T2 `injection` P(yes) = 0.91) is recorded with action `log` and taints the session; the following `mail.send` to an external domain gets `require_approval` from `tool_governance.lethal_trifecta`. Note that `policy/bouncer.yaml` currently has `tool_governance.arguments.mail.send.action: block` with `to_domains_allow: [bank.example]`, which would turn that step into `block` instead of an approval. Decide which one the demo should show (PLAN.md section 9 says approval).
+- Fixture scenario 3 assumes that an injection found in a **tool result** is only recorded (`log`) and that the following `mail.send` to an external domain is held for approval. The shipped policy does not work that way: injection heuristics block a tool result (`prompt_injection.heuristics.action: block`), the judge blocks at P(yes) >= 0.50, and `mail.send` to a domain outside `bank.example` is `block`. The real scenario `s3-indirect-injection-trifecta` therefore ends with `block` at the tool result; the approval flow (lethal trifecta, `require_approval`) is shown by `s3e-trifecta-approval` with a transfer.
 - `GET /api/controls` must list controls that are missing from the policy as disabled; that is how a deleted section becomes visible to the jury.

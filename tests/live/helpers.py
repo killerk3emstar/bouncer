@@ -195,13 +195,14 @@ class LiveStack:
         request: dict[str, Any] | None = None,
         guard: dict[str, Any] | None = None,
         api_key: str | None = None,
+        extra_headers: dict[str, str] | None = None,
         auth: bool = True,
         mock_response: Any = None,
         clear_mock: bool = True,
     ) -> StepResult:
         """One request. A scripted reply replaces the mock's queue; otherwise the queue is cleared
         (clear_mock=True, so a reply left over by a blocked step cannot leak into this one) or left alone."""
-        headers = {"X-Bouncer-Session": session}
+        headers = {"X-Bouncer-Session": session, **{str(k): str(v) for k, v in (extra_headers or {}).items()}}
         if principal is not None and auth:
             headers["Authorization"] = f"Bearer {api_key or self.keys.get(principal, 'bk_unknown')}"
         n_before = None
