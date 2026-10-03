@@ -28,9 +28,13 @@ def env(tmp_path: Path):  # noqa: ANN201
     policy = tmp_path / "bouncer.yaml"
     shutil.copy("policy/bouncer.yaml", policy)
     mock = MockState()
+    from judge.backends.fake import FakeBackend
+
+    judge = FakeBackend().script({"goal_alignment": {"aligned": 0.9, "unclear": 0.05, "misaligned": 0.05}, "exfiltration": {"yes": 0.05, "no": 0.95}})
     app = create_app(
         Settings(policy_path=str(policy), audit_path=str(tmp_path / "audit.jsonl"), t1="fake", judge_override="fake", watch=False),
         upstream_transport=httpx.ASGITransport(app=create_mock(mock)),
+        fake_judge=judge,
     )
     return app, mock, policy
 

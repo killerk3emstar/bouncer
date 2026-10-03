@@ -1,0 +1,41 @@
+{
+ "backend": "ollama-guard",
+ "model": "llama-guard3:1b",
+ "questions": [
+  "injection",
+  "goal_alignment",
+  "exfiltration"
+ ],
+ "sizes": {
+  "300": {
+   "state_tokens": 317,
+   "input_tokens": null,
+   "runs": 12,
+   "p50_ms": 672.7,
+   "p95_ms": 679.0,
+   "mean_ms": 672.5,
+   "min_ms": 667.1,
+   "max_ms": 680.9,
+   "client_wall_p50_ms": 672.7
+  },
+  "1000": {
+   "state_tokens": 1039,
+   "input_tokens": null,
+   "runs": 12,
+   "p50_ms": 936.9,
+   "p95_ms": 943.3,
+   "mean_ms": 938.0,
+   "min_ms": 929.3,
+   "max_ms": 958.1,
+   "client_wall_p50_ms": 936.9
+  }
+ },
+ "health": {
+  "backend": "ollama-guard",
+  "model": "llama-guard3:1b",
+  "info": {
+   "url": "http://localhost:11434",
+   "ollama_calls": 78
+  }
+ }
+}

@@ -39,12 +39,12 @@ def test_yaml_syntax_error_has_line_number() -> None:
 
 def test_schema_error_points_to_the_offending_line() -> None:
     text = POLICY.read_text()
-    bad = text.replace("block_above: 0.98", "block_above: 1.7", 1)
+    bad = text.replace("escalate_above: 0.50", "escalate_above: 1.7", 1)
     with pytest.raises(PolicyError) as exc:
         parse_policy(bad)
     expected_line = next(i for i, line in enumerate(bad.splitlines(), 1) if "1.7" in line)
     assert exc.value.line == expected_line
-    assert "block_above" in exc.value.message
+    assert "escalate_above" in exc.value.message
 
 
 def test_unknown_key_is_rejected() -> None:
@@ -111,8 +111,9 @@ def test_strict_profile_tightens_thresholds() -> None:
     assert strict.controls.prompt_injection.classifier.escalate_above <= 0.30
     assert strict.controls.pii.entities["NIP"] == "redact"
     assert strict.defaults.fail_mode == "closed"
+    assert strict.controls.prompt_injection.judge.block_above <= doc.controls.prompt_injection.judge.block_above
     # the baseline is untouched
-    assert doc.controls.prompt_injection.classifier.block_above == 0.98
+    assert doc.controls.prompt_injection.classifier.block_above == 1.0
 
 
 def test_permissive_profile_fails_open() -> None:

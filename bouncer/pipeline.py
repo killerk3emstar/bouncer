@@ -479,7 +479,7 @@ class Engine:
                 ctx.t1_scores.append({"source": seg.source, "score": score, "english": english})
                 if score is None:
                     continue
-                if english and score >= pi.classifier.block_above:
+                if english and pi.classifier.block_above < 1.0 and score >= pi.classifier.block_above:
                     out.append(
                         self._finding(
                             "prompt_injection",
@@ -531,7 +531,8 @@ class Engine:
             return out
         ctx.escalated = True
         for seg, clean, reason, _score in escalate:
-            state = {"USER_REQUEST": _clip(ctx.user_request, 1500), "UNTRUSTED_CONTENT": _clip(clean, 4000)}
+            # Clef latency grows with input length (measured 2.0 s at ~300 tokens, 4.1 s at ~1000 on M4 Pro)
+            state = {"USER_REQUEST": _clip(ctx.user_request, 600), "UNTRUSTED_CONTENT": _clip(clean, 2000)}
             res = await self._judge_call(ctx, state, {"injection": q.model_dump(exclude_none=True)}, reason)
             if res is None:
                 continue
@@ -794,11 +795,11 @@ class Engine:
         ctx.escalated = True
         untrusted = self._recent_untrusted(ctx)
         state = {
-            "USER_REQUEST": _clip(ctx.user_request, 1500),
-            "PROPOSED_ACTION": _clip(f"{name}({json.dumps(_mask_args(args), ensure_ascii=False)})", 2000),
+            "USER_REQUEST": _clip(ctx.user_request, 600),
+            "PROPOSED_ACTION": _clip(f"{name}({json.dumps(_mask_args(args), ensure_ascii=False)})", 1200),
         }
         if untrusted:
-            state["UNTRUSTED_CONTENT"] = _clip(untrusted, 2000)
+            state["UNTRUSTED_CONTENT"] = _clip(untrusted, 1200)
         res = await self._judge_call(ctx, state, qs, "side_effect_action")
         if res is None:
             return []
@@ -808,7 +809,21 @@ class Engine:
         answers = res.get("answers") or {}
         mis = float((answers.get("goal_alignment") or {}).get("misaligned", 0.0))
         exf = float((answers.get("exfiltration") or {}).get("yes", 0.0))
-        thr = tg.goal_alignment.block_above
+        ga = tg.goal_alignment
+        thr = ga.block_above
+        if ga.approval_above is not None and ga.approval_above <= mis < thr:
+            out.append(
+                self._finding(
+                    "tool_governance",
+                    "goal_unclear",
+                    Action.REQUIRE_APPROVAL,
+                    f"T2 judge is not sure {name} serves the user's request (p(misaligned)={mis:.2f}, approval at "
+                    f"{ga.approval_above}). A human must approve this exact call.",
+                    tier="T2",
+                    severity="medium",
+                    score=mis,
+                )
+            )
         if mis >= thr:
             out.append(
                 self._finding(
@@ -822,14 +837,14 @@ class Engine:
                     score=mis,
                 )
             )
-        if exf >= thr:
+        if exf >= ga.exfiltration_approval_above:
             out.append(
                 self._finding(
                     "tool_governance",
                     "exfiltration",
                     Action.REQUIRE_APPROVAL,
                     f"T2 judge rated {name} as sending internal or personal data outside the organization "
-                    f"(p={exf:.2f} >= {thr}). A human must approve it.",
+                    f"(p={exf:.2f} >= {ga.exfiltration_approval_above}). A human must approve it.",
                     tier="T2",
                     severity="high",
                     score=exf,

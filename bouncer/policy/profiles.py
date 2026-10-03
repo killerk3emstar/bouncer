@@ -3,8 +3,8 @@
 The values in policy/bouncer.yaml are the `balanced` baseline. A profile is a transform applied on
 top of the file, globally (`profile:`) or per principal (`principals.<id>.profile`):
 
-  strict      lowers injection thresholds, turns `log` PII into `redact`, requires approval for every
-              side-effect tool call, fails closed.
+  strict      lowers injection thresholds and lets T1 block on its own, turns `log` PII into `redact`,
+              requires approval for every side-effect tool call, fails closed.
   permissive  records non-critical findings as `log` instead of enforcing them (shadow rollout),
               keeps blocking critical ones, fails open.
   balanced    the file as written.
@@ -17,7 +17,7 @@ from bouncer.policy.schema import PolicyDoc
 PROFILE_NOTES = {
     "balanced": "Policy file as written.",
     "strict": (
-        "Injection thresholds capped (T1 block 0.90, escalate 0.30; T2 block 0.70, approval 0.45), "
+        "Injection thresholds capped (T1 blocks on its own at 0.90, escalates at 0.30; T2 block 0.40, approval 0.30), "
         "PII marked log becomes redact, every side-effect tool call needs approval, fail closed."
     ),
     "permissive": "Non-critical findings are recorded as log instead of enforced; critical ones still block; fail open.",
@@ -26,8 +26,8 @@ PROFILE_NOTES = {
 STRICT_CAPS = {
     "classifier.block_above": 0.90,
     "classifier.escalate_above": 0.30,
-    "judge.block_above": 0.70,
-    "judge.approval_above": 0.45,
+    "judge.block_above": 0.40,
+    "judge.approval_above": 0.30,
 }
 
 

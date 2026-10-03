@@ -182,7 +182,9 @@ class TrifectaCfg(Strict):
 class GoalAlignmentCfg(Strict):
     enabled: bool = True
     apply_to: Literal["side_effect_tools", "all_tools"] = "side_effect_tools"
-    block_above: float = Field(0.80, ge=0, le=1)
+    block_above: float = Field(0.60, ge=0, le=1)  # P(misaligned)
+    approval_above: float | None = Field(None, ge=0, le=1)  # P(misaligned) that needs a human
+    exfiltration_approval_above: float = Field(0.80, ge=0, le=1)  # P(exfiltration = yes)
 
 
 class ToolArgRule(Strict):

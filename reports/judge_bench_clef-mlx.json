@@ -1,0 +1,54 @@
+{
+ "backend": "clef-mlx",
+ "model": "clef-flash-mlx-4bit",
+ "questions": [
+  "injection",
+  "goal_alignment",
+  "exfiltration"
+ ],
+ "sizes": {
+  "300": {
+   "state_tokens": 317,
+   "input_tokens": 722,
+   "runs": 12,
+   "p50_ms": 1973.0,
+   "p95_ms": 2000.8,
+   "mean_ms": 1956.2,
+   "min_ms": 1839.3,
+   "max_ms": 2023.7,
+   "client_wall_p50_ms": 1974.0
+  },
+  "1000": {
+   "state_tokens": 1039,
+   "input_tokens": 1444,
+   "runs": 12,
+   "p50_ms": 4060.8,
+   "p95_ms": 4151.5,
+   "mean_ms": 4007.9,
+   "min_ms": 3806.1,
+   "max_ms": 4198.9,
+   "client_wall_p50_ms": 4062.9
+  }
+ },
+ "health": {
+  "status": "ok",
+  "backend": "clef-mlx",
+  "model": "clef-flash-mlx-4bit",
+  "loaded": true,
+  "load_ms": 2482.3,
+  "warmup_ms": 790.4,
+  "error": null,
+  "queue": 0,
+  "served": 26,
+  "failed": 0,
+  "latency_ms_p50": 2023.7,
+  "latency_ms_p95": 4198.9,
+  "info": {
+   "path": "models/clef-flash-mlx-4bit",
+   "max_tokens": 1536,
+   "load_ms": 2306.6711660067085,
+   "peak_memory_mb": 6088.4,
+   "active_memory_mb": 5269.2
+  }
+ }
+}

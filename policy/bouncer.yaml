@@ -137,9 +137,12 @@ controls:
 
   prompt_injection:                # OWASP LLM01, Agentic ASI01, ASI06
     apply_to: [user, tool_result, tool_definition]
-    heuristics: {action: block}                        # T0: known phrasings (EN, PL), chat-template tokens
-    classifier: {block_above: 0.98, escalate_above: 0.50}   # T1 score in [0, 1]
-    judge: {block_above: 0.85, approval_above: 0.60}        # T2 probability of "yes"
+    heuristics: {action: block}                        # T0: known phrasings (EN, PL, DE), chat-template tokens
+    # T1 score in [0, 1]. block_above 1.0 = T1 never blocks on its own: on our business-text set it flagged
+    # 26% of benign prompts at 0.5 (reports/eval.md), so a T1 hit only escalates to the T2 judge.
+    classifier: {block_above: 1.0, escalate_above: 0.50}
+    # T2 probability of "yes". Chosen on 70 labeled cases (reports/judge_go_no_go.md): 0.50 -> recall 0.84, no false positives.
+    judge: {block_above: 0.50, approval_above: 0.35}
     escalate_non_english: true     # T1 is English-only, so other languages always go to T2
 
   tool_governance:                 # OWASP LLM06, Agentic ASI02
@@ -151,7 +154,9 @@ controls:
       action: require_approval
     goal_alignment:                # T2: does the proposed tool call serve the user's request?
       apply_to: side_effect_tools
-      block_above: 0.80            # probability of "misaligned"
+      block_above: 0.60            # probability of "misaligned"
+      approval_above: 0.45         # unsure: a human decides
+      exfiltration_approval_above: 0.80   # T2 "does this send data outside the organization?"
     arguments:
       mail.send:
         to_domains_allow: [bank.example]
@@ -198,7 +203,7 @@ controls:
 judge:
   backend: clef-mlx                # clef-mlx | ollama-guard | fake | none
   url: http://localhost:8701
-  timeout_ms: 4000
+  timeout_ms: 8000                 # Clef MLX on M4 Pro: ~2 s for a 300-token state
   on_timeout: default              # default = use defaults.fail_mode
   cache_ttl_seconds: 900
   max_concurrency: 1
