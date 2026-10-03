@@ -4,10 +4,10 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 
 ## Tests (slide: proof)
 
-- `make test`: 1073 tests in about 10 s, no network, no models [run `make test`; reports/tests/summary.md].
-  - 434 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, red team, benign hard negatives).
+- `make test`: 1099 tests in about 10 to 11 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
+  - 437 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, red team, benign hard negatives).
   - The rest are unit tests (gateway mechanics, policy reload, audit chain, controls, judge, T1, signatures, MCP gateway, demo).
-- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 358 passed, 75 skipped (cases that need scripted judge answers or policy patches), 0 failed, 21 s.
+- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 0 failed (last run: 361 passed and 79 skipped before the delegation cases were wired to the live runner; skipped = cases that need scripted judge answers or policy patches).
 - `make demo`: 12 of 12 scripted attack scenarios pass, including an MCP rug pull.
 - Docker: `docker compose run --rm tests` passes the same suite in a Linux container (one Apple-only test skipped).
 
@@ -47,7 +47,7 @@ Clef-flash (Cloudflare, Apache 2.0), MLX 4-bit, one forward pass answers several
 - Gateway overhead p50: 10.8 ms for a short prompt, 83 ms for a 2 KB prompt; 0.2 ms when the same prompt repeats (cached). T1 is 88 to 95% of it; T0 is 0.3 to 2.6 ms.
 - Throughput with T1: about 187 requests per second at 8 to 32 concurrent clients, p95 98 ms at 32 clients. Without T1: about 620 requests per second.
 - Allowing 3 concurrent T1 inferences instead of 1 doubled throughput (95 to 187 req/s) and cut p95 at 32 clients from 2.2 s to 98 ms.
-- MCP gateway: 7.7 ms overhead p50 per tool call [MCP agent measurement, see docs/STATUS.md].
+- MCP gateway: about 5 to 8 ms overhead per tool call without the judge (one-off measurements on the live stack, not in a report); about 1.9 s when the judge is called for a side-effect tool.
 
 ## T1 classifier facts (slide: three layers, honest limits)
 
@@ -58,12 +58,16 @@ Clef-flash (Cloudflare, Apache 2.0), MLX 4-bit, one forward pass answers several
 
 ## Security bugs we found in our own code and fixed (slide: optional, credibility)
 
-All found by tests, the red team or the security review during the night, fixed with regression tests:
+All found by tests, the red team or a dedicated security review during the night, each fixed with a regression test (full list with status: reports/security_review.md). Examples:
 
 - the audit excerpt could contain a secret from the request (now every secret and PII value is masked whatever the action);
 - tool-call arguments with secrets reached the audit record;
 - the AI layers received text before redaction;
-- the dashboard self-test overwrote the gateway's API keys.
+- the dashboard self-test overwrote the gateway's API keys;
+- without an admin token an agent on the same host could approve its own held call (the admin API now always needs a token, agents can only poll their own approval);
+- approvals could be reused within their window (now single-use, bound to agent and session);
+- MCP results wrapped in embedded resources were not scanned;
+- an older, validly signed signature feed could replace a newer one (rollback now refused).
 
 ## Screenshots
 
