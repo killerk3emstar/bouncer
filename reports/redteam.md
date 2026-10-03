@@ -22,7 +22,19 @@ Probe set: `scripts/redteam/probes.py` (82 attacks, 46 hard negatives). Harness:
 `scripts/redteam/harness.py`. All secrets/PII in the probes are synthetic EXAMPLE values (the same
 fixtures the unit tests use).
 
-## Numbers
+## Re-run after fixes (2026-10-04 01:35)
+
+All four gaps above were fixed in the controls and the policy (internal e-mail domains in `pii.internal_domains`;
+phone numbers need phone context; per-character homoglyph folding; separator-free and near-miss matching for the
+override and prompt-leak phrases; claimed-authority pattern). Same probe set, same harness:
+
+| | Attacks stopped | Benign passed |
+|---|---|---|
+| Mode (b) real ONNX T1 + fake judge | **82 / 82** | **46 / 46** |
+
+Reproduce: `uv run python scripts/redteam/run.py onnx`.
+
+## Numbers (first run, before the fixes)
 
 | | Attacks stopped | Benign passed |
 |---|---|---|
