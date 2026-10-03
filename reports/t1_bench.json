@@ -1,0 +1,72 @@
+{
+  "hardware": "Apple M4 Pro, 48 GB RAM, Darwin 27.0.0, Python 3.12.11",
+  "onnxruntime": "1.30.0",
+  "provider": "CPUExecutionProvider",
+  "intra_op_threads": 4,
+  "model": "protectai/deberta-v3-base-prompt-injection-v2 (ONNX fp32)",
+  "model_path": "models/deberta-pi-v2/onnx",
+  "load_and_warmup_seconds": 0.93,
+  "load_average_before": [
+    7.65,
+    6.81,
+    5.41
+  ],
+  "load_average_after": [
+    8.35,
+    7.13,
+    5.61
+  ],
+  "python": "3.12.11",
+  "cases": {
+    "1 text, ~50 tokens": {
+      "texts": 1,
+      "tokens_per_text": 51,
+      "windows": 1,
+      "iters": 40,
+      "p50_ms": 15.360895995399915,
+      "p95_ms": 23.69629169043037,
+      "mean_ms": 16.190295874912408,
+      "min_ms": 13.17054100218229
+    },
+    "1 text, ~300 tokens": {
+      "texts": 1,
+      "tokens_per_text": 300,
+      "windows": 1,
+      "iters": 40,
+      "p50_ms": 69.98074948933208,
+      "p95_ms": 89.5638777546992,
+      "mean_ms": 73.45695417316165,
+      "min_ms": 66.04187500488479
+    },
+    "1 text, ~1000 tokens (3 windows)": {
+      "texts": 1,
+      "tokens_per_text": 1000,
+      "windows": 3,
+      "iters": 40,
+      "p50_ms": 470.9186665058951,
+      "p95_ms": 513.5016937507316,
+      "mean_ms": 469.08084377646446,
+      "min_ms": 407.6683330058586
+    },
+    "batch of 8 texts, ~50 tokens each": {
+      "texts": 8,
+      "tokens_per_text": 54,
+      "windows": 8,
+      "iters": 40,
+      "p50_ms": 89.8649165101233,
+      "p95_ms": 108.30026874973555,
+      "mean_ms": 92.80700207418704,
+      "min_ms": 82.61454199964646
+    },
+    "batch of 8 texts, ~300 tokens each": {
+      "texts": 8,
+      "tokens_per_text": 303,
+      "windows": 8,
+      "iters": 40,
+      "p50_ms": 638.6172500060638,
+      "p95_ms": 724.62672229085,
+      "mean_ms": 640.273668874579,
+      "min_ms": 557.6207080011955
+    }
+  }
+}
