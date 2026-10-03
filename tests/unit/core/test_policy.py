@@ -150,3 +150,17 @@ def test_rejected_reload_has_dashboard_fields(policy_file: Path) -> None:
     assert any("8.5" in s["text"] for s in err["snippet"])
     assert err["attempted_version"].startswith("sha256:")
     assert mgr.rejected and "8.5" in mgr.rejected[0]["diff"]
+
+
+def test_feed_settings_change_rebuilds_the_feed_store(policy_file: Path) -> None:
+    mgr = PolicyManager(policy_file)
+    mgr.load_initial()
+    first = mgr.shared["feed_store"]
+    assert all(v.controls["signatures"].store is first for v in mgr.current.variants.values())
+    policy_file.write_text(policy_file.read_text().replace("refresh_seconds: 30", "refresh_seconds: 5", 1))
+    assert mgr.reload()
+    assert mgr.shared["feed_store"] is first and first.refresh_seconds == 5
+    policy_file.write_text(policy_file.read_text().replace("require_signature: true", "require_signature: false", 1))
+    assert mgr.reload()
+    assert mgr.shared["feed_store"] is not first
+    assert mgr.shared["feed_store"].require_signature is False
