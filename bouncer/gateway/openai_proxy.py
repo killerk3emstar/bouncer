@@ -477,7 +477,13 @@ async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], f
                 if meta:
                     g.store.record_tool_call(ctx.session_id, meta["call_hash"])
                 yield _sse(base, {"tool_calls": [{"index": i, **tc}]})
-            final = {**base, "object": "chat.completion.chunk", "choices": [{"index": 0, "delta": {}, "finish_reason": finish_reason or ("tool_calls" if tool_calls else "stop")}]}
+            final = {
+                **base,
+                "object": "chat.completion.chunk",
+                "choices": [{"index": 0, "delta": {}, "finish_reason": finish_reason or ("tool_calls" if tool_calls else "stop")}],
+                # headers were sent before the output was checked; the final decision travels here
+                "bouncer": {"action": overall.label, "trace_id": ctx.trace_id, "findings": sorted({f.id for f in ctx.findings})},
+            }
             yield f"data: {json.dumps(final)}\n\n"
             if client_wants_usage:
                 yield f"data: {json.dumps({**base, 'object': 'chat.completion.chunk', 'choices': [], 'usage': {k: v for k, v in usage.items() if k != 'estimated'}})}\n\n"

@@ -254,3 +254,15 @@ def test_audit_excerpt_never_contains_secrets(env, content: str, secret: str) ->
     r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": content}]}))
     ev = app.state.gw.audit.get(r.headers["x-bouncer-trace-id"])
     assert secret not in json.dumps(ev), ev["excerpt"]
+
+
+def test_stream_final_chunk_carries_final_decision(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    mock.script([{"content": "Your key AKIAIOSFODNN7EXAMPLE is fine, nothing else to report today.", "chunk_size": 5}])
+    r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "stream": True, "messages": [{"role": "user", "content": "Is my config fine?"}]}))
+    assert r.headers["x-bouncer-action"] == "allow"  # input decision only
+    finals = [json.loads(line[5:]) for line in r.text.splitlines() if line.startswith("data:") and '"bouncer"' in line]
+    assert finals and finals[-1]["bouncer"]["action"] == "redact"
+    assert "secrets.aws-access-key-id" in finals[-1]["bouncer"]["findings"]
+    text, _ = _stream_text(r.text)
+    assert "AKIAIOSFODNN7EXAMPLE" not in text
