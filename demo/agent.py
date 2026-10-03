@@ -508,6 +508,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from dotenv import load_dotenv
+
+    load_dotenv(override=False)  # keys from .env (make setup creates it)
     args = build_parser().parse_args(argv)
 
     if args.mode == "scripted":
