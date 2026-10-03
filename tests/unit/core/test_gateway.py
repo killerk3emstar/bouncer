@@ -151,3 +151,14 @@ def test_unauthorized_is_audited(env) -> None:  # noqa: ANN001
     assert r.status_code == 401
     ev = app.state.gw.audit.get(r.headers["x-bouncer-trace-id"])
     assert ev["findings"][0]["id"] == "auth.invalid_key"
+
+
+def test_selftest_runner_does_not_touch_process_keys(tmp_path: Path) -> None:
+    from bouncer.selftest import CaseRunner
+
+    os.environ["BOUNCER_KEY_OPS_COPILOT"] = "bk_real_key_of_the_live_gateway"
+    runner = CaseRunner(workdir=tmp_path)
+    case = {"id": "x", "control": "auth", "principal": "ops-copilot", "request": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hi"}]}, "expect": {"action": "allow"}}
+    res = asyncio.run(runner.run_case(case))
+    assert res.passed, res.failures
+    assert os.environ["BOUNCER_KEY_OPS_COPILOT"] == "bk_real_key_of_the_live_gateway"

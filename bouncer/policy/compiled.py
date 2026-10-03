@@ -146,8 +146,9 @@ def compile_policy(doc: PolicyDoc, text: str, source_path: str, shared: dict[str
     shared = shared if shared is not None else {}
     variants = {p: build_variant(doc, p, shared) for p in ("balanced", "strict", "permissive")}
     keys: dict[str, str] = {}
+    env = shared.get("env") or os.environ  # tests and the self-test pass their own keys here
     for pid, p in doc.principals.items():
-        key = os.environ.get(p.key_env)
+        key = env.get(p.key_env)
         if key:
             keys[key] = pid
     return CompiledPolicy(

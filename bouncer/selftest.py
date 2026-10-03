@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
-import os
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -143,10 +142,13 @@ class CaseRunner:
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.mock_state = MockState()
         self.transport = httpx.ASGITransport(app=create_mock(self.mock_state))
+        # test keys are passed to the app explicitly; the process environment is never modified,
+        # so running the self-test inside a live gateway does not touch the real agent keys
         self.keys: dict[str, str] = {}
+        self.key_env: dict[str, str] = {}
         for pid, p in (self.base.get("principals") or {}).items():
             key = f"bk_test_{pid.replace('-', '_')}"
-            os.environ[p["key_env"]] = key
+            self.key_env[p["key_env"]] = key
             self.keys[pid] = key
         self._apps: dict[str, Any] = {}
 
@@ -162,9 +164,10 @@ class CaseRunner:
         n = len(self._apps)
         ppath = self.workdir / f"policy-{n}.yaml"
         ppath.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+        key_env = dict(self.key_env)
         for pid, p in (doc.get("principals") or {}).items():
-            os.environ.setdefault(p["key_env"], f"bk_test_{pid.replace('-', '_')}")
-            self.keys.setdefault(pid, os.environ[p["key_env"]])
+            key_env.setdefault(p["key_env"], f"bk_test_{pid.replace('-', '_')}")
+            self.keys.setdefault(pid, key_env[p["key_env"]])
         try:
             from bouncer.t1.fake import FakeInjectionClassifier
 
@@ -183,6 +186,7 @@ class CaseRunner:
             t1="fake",
             judge_override="fake",
             watch=False,
+            key_overrides=key_env,
         )
         app = create_app(settings, upstream_transport=self.transport, classifier=clf, fake_judge=fake_judge)
         app.state.fake_judge = fake_judge

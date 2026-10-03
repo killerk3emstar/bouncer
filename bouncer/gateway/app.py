@@ -36,6 +36,8 @@ def build_state(
 ) -> GatewayState:
     telemetry = Telemetry()
     shared: dict[str, Any] = {}
+    if settings.key_overrides is not None:
+        shared["env"] = settings.key_overrides
     holder: dict[str, Any] = {}
 
     def on_policy_event(kind: str, data: dict[str, Any]) -> None:

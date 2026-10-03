@@ -29,6 +29,7 @@ class Settings:
     admin_token: str | None = None
     watch: bool = True
     root: str = "."
+    key_overrides: dict[str, str] | None = None  # env var name -> key; used instead of os.environ when set
 
     @classmethod
     def from_env(cls) -> Settings:
