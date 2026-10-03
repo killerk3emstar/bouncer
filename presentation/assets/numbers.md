@@ -7,7 +7,7 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 - `make test`: 1099 tests in about 10 to 11 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
   - 437 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, red team, benign hard negatives).
   - The rest are unit tests (gateway mechanics, policy reload, audit chain, controls, judge, T1, signatures, MCP gateway, demo).
-- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 0 failed (last run: 361 passed and 79 skipped before the delegation cases were wired to the live runner; skipped = cases that need scripted judge answers or policy patches).
+- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 364 passed, 79 skipped (cases that need scripted judge answers or policy patches), 0 failed, about 100 s.
 - `make demo`: 12 of 12 scripted attack scenarios pass, including an MCP rug pull.
 - Docker: `docker compose run --rm tests` passes the same suite in a Linux container (one Apple-only test skipped).
 
