@@ -39,6 +39,7 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+junit_family = "xunit1"
 addopts = "-q --timeout=60 --import-mode=importlib"
 markers = [
     "live: needs the running stack, real models and network (make test-live)",
