@@ -49,7 +49,7 @@ class AuditLog:
         self.path = Path(path) if path else None
         self.hash_chain = hash_chain
         self.events: deque[dict[str, Any]] = deque(maxlen=memory_size)
-        self.by_trace: dict[str, dict[str, Any]] = {}
+        self.by_trace: dict[str, list[dict[str, Any]]] = {}
         self._lock = threading.Lock()
         self._subscribers: set[asyncio.Queue] = set()
         self.seq = 0
@@ -78,10 +78,15 @@ class AuditLog:
     def _remember(self, ev: dict[str, Any]) -> None:
         if len(self.events) == self.events.maxlen:
             old = self.events[0]
-            self.by_trace.pop(old.get("trace_id", ""), None)
+            bucket = self.by_trace.get(old.get("trace_id", ""))
+            if bucket and old in bucket:
+                bucket.remove(old)
+                if not bucket:
+                    self.by_trace.pop(old.get("trace_id", ""), None)
         self.events.append(ev)
         if ev.get("trace_id"):
-            self.by_trace[ev["trace_id"]] = ev
+            # several events can share a trace id (the decision, then approval.decided)
+            self.by_trace.setdefault(ev["trace_id"], []).append(ev)
 
     def write(self, event: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -114,7 +119,17 @@ class AuditLog:
         self._subscribers.discard(q)
 
     def get(self, trace_id: str) -> dict[str, Any] | None:
-        return self.by_trace.get(trace_id)
+        """The decision event of a trace (or the first event when there is no decision)."""
+        bucket = self.by_trace.get(trace_id) or []
+        for ev in bucket:
+            if ev.get("type", "decision") == "decision":
+                return ev
+        return bucket[0] if bucket else None
+
+    def trace(self, trace_id: str) -> list[dict[str, Any]]:
+        """All events of a trace, decision first."""
+        bucket = list(self.by_trace.get(trace_id) or [])
+        return sorted(bucket, key=lambda e: (e.get("type", "decision") != "decision", e.get("seq", 0)))
 
     def query(
         self,

@@ -260,13 +260,13 @@ async def events_stream(request: Request) -> StreamingResponse:
 @router.get("/api/events/{trace_id}")
 async def event_detail(request: Request, trace_id: str) -> Any:
     g = gw(request)
-    ev = g.audit.get(trace_id)
-    if ev is None:
+    events = g.audit.trace(trace_id)
+    if not events:
         return JSONResponse({"error": {"type": "not_found", "message": f"No event with trace id {trace_id} in the in-memory buffer; use the audit export for older events."}}, status_code=404)
     from bouncer.audit import chain_hash
 
-    chain_ok = (ev.get("hash") == chain_hash(ev.get("prev_hash", ""), ev)) if ev.get("hash") else None
-    return {"trace_id": trace_id, "chain_ok": chain_ok, "events": [ev]}
+    chain_ok = all(ev.get("hash") == chain_hash(ev.get("prev_hash", ""), ev) for ev in events if ev.get("hash"))
+    return {"trace_id": trace_id, "chain_ok": chain_ok, "events": events}
 
 
 # ---------------------------------------------------------------------------- controls and coverage

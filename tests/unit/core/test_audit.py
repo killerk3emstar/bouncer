@@ -76,3 +76,13 @@ def test_store_replays_todays_spend_from_audit(tmp_path: Path) -> None:
     assert store.replay_spend(AuditLog(tmp_path / "a.jsonl").events) == 2
     assert abs(store.team_spend_today("operations") - 0.75) < 1e-9
     assert abs(store.sessions["s1"].usd - 0.75) < 1e-9
+
+
+def test_trace_keeps_the_decision_first(tmp_path: Path) -> None:
+    log = AuditLog(tmp_path / "a.jsonl")
+    log.write({"type": "decision", "trace_id": "tr_x", "action": "require_approval"})
+    log.write({"type": "approval.decided", "trace_id": "tr_x", "decision": "approved"})
+    assert log.get("tr_x")["type"] == "decision"
+    assert [e["type"] for e in log.trace("tr_x")] == ["decision", "approval.decided"]
+    resumed = AuditLog(tmp_path / "a.jsonl")
+    assert resumed.get("tr_x")["action"] == "require_approval"
