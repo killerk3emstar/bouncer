@@ -681,6 +681,26 @@ class Engine:
             seg = Segment(args_text or "", "tool_call", f"tool_call:{name}", False, loc, tool=name)
             clean, seg_findings, _ = self.scan_segment(ctx, seg, use_cache=False)
             call_findings: list[Finding] = list(seg_findings)
+            os_cfg = doc.controls.output_safety
+            if (
+                ctx.scan.canary
+                and os_cfg is not None
+                and os_cfg.enabled
+                and os_cfg.canary.enabled
+                and ctx.scan.canary in (args_text or "")
+                and not any(f.id == "output_safety.canary" for f in call_findings)
+            ):
+                call_findings.append(
+                    self._finding(
+                        "output_safety",
+                        "canary",
+                        os_cfg.canary.action,
+                        f"The arguments of {name} contain the canary token from the system prompt: the model is "
+                        "leaking its instructions through a tool call. Review the conversation for a prompt-leak attempt.",
+                        severity="critical",
+                        owasp_llm=["LLM07"],
+                    )
+                )
             h = call_hash(name, args)
             record = {"tool": name, "wire_name": wire, "call_hash": h, "arguments": _mask_args(args)}
             if tg is not None:
@@ -722,10 +742,15 @@ class Engine:
                         f.message += f" Approved by a human ({appr.id}), allowed once within the approval window."
             record["findings"] = [f.id for f in call_findings]
             ctx.tool_calls.append(record)
-            # redact arguments in place
+            # redact arguments in place; the audit record and approvals only ever see the redacted form
             red = [f for f in seg_findings if f.action == Action.REDACT and f.span is not None]
             if red:
                 fn["arguments"] = apply_redactions(clean, red)
+                record["arguments"] = _mask_args(parse_args(fn["arguments"]))
+            elif any(f.control in REDACTION_CONTROLS for f in seg_findings):
+                # a secret or PII value that is blocked or logged (not redacted) must still not reach the audit log
+                spans = [f for f in seg_findings if f.control in REDACTION_CONTROLS and f.span is not None]
+                record["arguments"] = _mask_args(parse_args(apply_redactions(clean, spans)))
             tc["_bouncer"] = {"tool": name, "call_hash": h, "findings": call_findings}
             findings.extend(call_findings)
         return findings

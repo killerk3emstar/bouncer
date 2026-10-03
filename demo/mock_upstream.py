@@ -120,6 +120,14 @@ def create_app(state: MockState | None = None) -> FastAPI:
             return JSONResponse({"error": {"message": err.get("message", "mock error"), "type": "mock_error"}}, status_code=int(err.get("status", 500)))
         model = body.get("model", "mock")
         content = item.get("content")
+        system = "\n".join(
+            str(m.get("content")) for m in body.get("messages") or [] if m.get("role") in ("system", "developer")
+        )
+        if content and "{{system}}" in content:
+            # simulates a model that leaks its system prompt (used by the canary tests)
+            content = content.replace("{{system}}", system)
+        if "tool_calls" in item and "{{system}}" in json.dumps(item["tool_calls"]):
+            item = json.loads(json.dumps(item).replace("{{system}}", json.dumps(system)[1:-1]))
         tool_calls = _tool_calls(item)
         prompt_tokens = _estimate_tokens(_prompt_text(body))
         completion_tokens = _estimate_tokens((content or "") + "".join(tc["function"]["arguments"] for tc in tool_calls))

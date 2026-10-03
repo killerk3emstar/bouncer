@@ -185,3 +185,15 @@ def test_policy_edit_validates_then_writes(env) -> None:  # noqa: ANN001
     ok = asyncio.run(call("PUT", "/api/policy", {"source": src.replace("EMAIL: redact", "EMAIL: block", 1), "expected_version": gw.policies.current.version}))
     assert ok.status_code == 200 and ok.json()["changed"] is True
     assert gw.policies.current.doc.controls.pii.entities["EMAIL"] == "block"
+
+
+def test_audit_never_holds_unredacted_tool_arguments(env) -> None:  # noqa: ANN001
+    app, _, _ = env
+    secret = "AKIAIOSFODNN7EXAMPLE"
+    r = asyncio.run(
+        _post(app, {"tool_call": {"name": "web.fetch", "arguments": {"url": f"https://vendor.example/x?key={secret}"}}}, path="/v1/guard/check")
+    )
+    ev = app.state.gw.audit.get(r.json()["trace_id"])
+    assert secret not in json.dumps(ev)
+    for appr in app.state.gw.store.list_approvals():
+        assert secret not in appr.arguments_masked

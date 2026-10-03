@@ -1,7 +1,7 @@
 {
   "feed": "bouncer-community",
-  "version": 1,
-  "updated": "2026-10-03T22:28:32Z",
+  "version": 2,
+  "updated": "2026-10-03T22:37:56Z",
   "signatures": [
     {
       "id": "SIG-0001",
@@ -569,14 +569,14 @@
     {
       "id": "SIG-0017",
       "title": "DAN / developer-mode / Skeleton Key jailbreak",
-      "description": "Known jailbreak framings: DAN ('do anything now'), 'developer mode enabled', or Skeleton Key ('safe educational context ... update your behavior'). Refuse the role-play that removes guardrails.",
+      "description": "Known jailbreak framings: DAN ('do anything now'), an assistant told to act or answer in 'developer mode', or Skeleton Key ('safe educational context ... update your behavior ... prefix with Warning'). Asking how to enable developer mode on a device, or about these attacks, does not match.",
       "targets": [
         "input",
         "tool_result"
       ],
       "match": {
         "type": "regex",
-        "pattern": "\\bdo anything now\\b|\\bDAN mode\\b|\\byou are (?:now )?DAN\\b|(?:enable|activate|entering?) (?:developer|dev) mode|developer mode (?:enabled|output|is on)|\\bskeleton key\\b|this is a safe (?:educational|fictional|research) (?:context|environment|setting)[\\s\\S]{0,160}?(?:researchers|ethics|uncensored|warning)"
+        "pattern": "\\bdo anything now\\b|\\bDAN mode\\b|\\byou are (?:now )?(?:a )?DAN\\b|(?:you are|you're|you will|act|acting|respond|answer|reply|operate)[^.\\n]{0,50}\\b(?:in|with) (?:developer|dev) mode\\b|\\b(?:developer|dev) mode output\\b|update your behaviou?r to [\\s\\S]{0,200}?\\bwarning\\b|this is a safe (?:educational|fictional|research) (?:context|environment|setting)[\\s\\S]{0,160}?(?:researchers|ethics|uncensored|warning)"
       },
       "decode": [],
       "severity": "high",

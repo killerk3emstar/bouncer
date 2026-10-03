@@ -21,11 +21,14 @@ Environment (see .env.example):
   BOUNCER_KEY_OPS_COPILOT, BOUNCER_KEY_DEV_ASSISTANT, BOUNCER_KEY_INTERN_BOT,
   BOUNCER_KEY_PLAYGROUND   API key per principal
   MOCK_URL                 mock upstream base, default http://localhost:8702 (scripted mode)
+  BOUNCER_MCP_URL          gateway MCP endpoint for kind: mcp scenarios, default <gateway>/mcp
+  DEMO_MCP_ADMIN_URL       demo MCP server (poison toggle) for kind: mcp scenarios, default http://127.0.0.1:8703
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -43,6 +46,7 @@ from demo.scenario import as_list, forbidden_strings, get_scenario, load_scenari
 
 DEFAULT_BOUNCER_URL = os.environ.get("BOUNCER_URL", "http://localhost:8700/v1")
 DEFAULT_MOCK_URL = os.environ.get("MOCK_URL", "http://localhost:8702")
+DEFAULT_MCP_ADMIN_URL = os.environ.get("DEMO_MCP_ADMIN_URL", "http://127.0.0.1:8703")
 MAX_STEPS = 12
 APPROVAL_POLL_SECONDS = 3
 APPROVAL_TIMEOUT_SECONDS = 180
@@ -280,11 +284,7 @@ def run_scenario(
     scenario: dict[str, Any], *, base_url: str, mock_url: str, wait_approval: bool, verbose: bool
 ) -> RunResult:
     if scenario.get("kind") == "mcp":
-        res = RunResult(scenario_id=scenario["id"], outcome="blocked")
-        res.error = "mcp scenario: run with demo/mcp_server.py and the gateway MCP endpoint (see demo/README.md)"
-        if verbose:
-            print(f"  {scenario['id']}: MCP scenario, not an OpenAI chat run ({res.error})")
-        return res
+        return run_mcp_scenario(scenario, base_url=base_url, verbose=verbose)
 
     principal = scenario["principal"]
     session_id = f"demo-{scenario['id']}-{uuid.uuid4().hex[:8]}"
@@ -304,6 +304,127 @@ def run_scenario(
         client, model=scenario["model"], messages=messages, tools=tools, base_url=base_url,
         scenario_id=scenario["id"], wait_approval=wait_approval, verbose=verbose,
     )
+
+
+# ---------------------------------------------------------------------------
+# MCP scenarios (kind: mcp): an MCP client talks to the gateway's /mcp endpoint
+# ---------------------------------------------------------------------------
+
+
+class McpUnavailable(RuntimeError):
+    """The gateway MCP endpoint or the demo MCP server is not reachable."""
+
+
+def mcp_url_for(base_url: str) -> str:
+    return os.environ.get("BOUNCER_MCP_URL") or base_url.rsplit("/v1", 1)[0].rstrip("/") + "/mcp"
+
+
+def run_mcp_scenario(
+    scenario: dict[str, Any], *, base_url: str, verbose: bool, admin_url: str | None = None
+) -> RunResult:
+    """Run `mcp_steps` against the gateway MCP endpoint with the scenario principal's Bouncer key.
+
+    Steps: `admin: {poison: bool}` toggles the demo MCP server's poisoned definition (directly,
+    not through Bouncer); `list_tools: {}` with optional `expect: {visible: [...], hidden: [...]}`;
+    `call_tool: {name, arguments}` with optional `expect: allow | block`. A Bouncer block arrives as
+    an MCP tool error whose `_meta.bouncer` carries code, message, trace id and approval id.
+    """
+    session_id = f"demo-{scenario['id']}-{uuid.uuid4().hex[:8]}"
+    mcp_url = mcp_url_for(base_url)
+    admin_url = admin_url or DEFAULT_MCP_ADMIN_URL
+    if verbose:
+        print(f"=== {scenario['id']}: {scenario['title']} ===")
+        print(f"    principal={scenario['principal']} mcp={mcp_url} admin={admin_url} session={session_id}")
+        print(f"    expect: {scenario['description']}")
+    return asyncio.run(
+        _mcp_steps(scenario, mcp_url, admin_url, resolve_key(scenario["principal"]), session_id, verbose)
+    )
+
+
+async def _mcp_steps(
+    scenario: dict[str, Any], mcp_url: str, admin_url: str, key: str, session_id: str, verbose: bool
+) -> RunResult:
+    from fastmcp import Client
+    from fastmcp.client.transports import StreamableHttpTransport
+    from mcp.shared.exceptions import MCPError
+
+    result = RunResult(scenario_id=scenario["id"], outcome="completed")
+    problems: list[str] = []
+    transport = StreamableHttpTransport(mcp_url, headers={"X-Bouncer-Session": session_id}, auth=key)
+    async with httpx.AsyncClient(base_url=admin_url, timeout=10.0) as admin:
+        try:
+            (await admin.get("/admin/poison")).raise_for_status()
+        except httpx.HTTPError as exc:
+            raise McpUnavailable(f"demo MCP server not reachable at {admin_url} ({exc})") from exc
+        try:
+            client = Client(transport)
+            await client.__aenter__()
+        except Exception as exc:
+            raise McpUnavailable(f"gateway MCP endpoint not reachable at {mcp_url} ({exc})") from exc
+        try:
+            for i, step in enumerate(scenario["mcp_steps"], 1):
+                expect = step.get("expect")
+                if "admin" in step:
+                    poison = bool((step["admin"] or {}).get("poison"))
+                    (await admin.post("/admin/poison", json={"poison": poison})).raise_for_status()
+                    if verbose:
+                        print(f"[step {i}] demo MCP server: poisoned definition {'ON' if poison else 'OFF'}")
+                elif "list_tools" in step:
+                    try:
+                        names = [t.name for t in await client.list_tools()]
+                    except MCPError as exc:  # Bouncer refused the whole listing (e.g. server not allowed)
+                        meta = (exc.data or {}).get("bouncer", {}) if isinstance(exc.data, dict) else {}
+                        result.steps.append(StepRecord(i, "block", meta.get("trace_id"), "blocked", exc.message, meta.get("code")))
+                        if result.block_code is None:
+                            result.outcome, result.block_code, result.block_message = "blocked", meta.get("code"), exc.message
+                        if verbose:
+                            print(f"[step {i}] tools/list -> BLOCKED code={meta.get('code')} trace={meta.get('trace_id')}")
+                            print(f"           {exc.message}")
+                        problems.append(f"step {i}: tools/list refused ({meta.get('code')})")
+                        continue
+                    result.steps.append(StepRecord(i, "allow", None, "list_tools", ", ".join(names)))
+                    if verbose:
+                        print(f"[step {i}] tools/list -> {', '.join(names) or '(none)'}")
+                    exp = expect if isinstance(expect, dict) else {}
+                    if expect == "poisoned_definition_hidden":
+                        exp = {"hidden": ["kb.search"]}
+                    for tool in exp.get("hidden", []):
+                        if tool in names:
+                            problems.append(f"step {i}: {tool} should be hidden")
+                    for tool in exp.get("visible", []):
+                        if tool not in names:
+                            problems.append(f"step {i}: {tool} should be listed")
+                elif "call_tool" in step:
+                    spec = step["call_tool"]
+                    res = await client.call_tool_mcp(spec["name"], spec.get("arguments") or {})
+                    meta = (res.meta or {}).get("bouncer") or {}
+                    text = "\n".join(getattr(b, "text", "") for b in res.content)
+                    blocked = bool(res.is_error and meta.get("code"))
+                    action = meta.get("action") or ("block" if blocked else None)
+                    if blocked:
+                        result.steps.append(StepRecord(i, action, meta.get("trace_id"), "blocked", meta.get("message", text), meta.get("code")))
+                        if result.block_code is None:
+                            result.outcome = "approval_required" if action == "require_approval" else "blocked"
+                            result.block_code, result.block_message = meta.get("code"), meta.get("message")
+                        if verbose:
+                            print(f"[step {i}] tools/call {spec['name']} -> BLOCKED code={meta.get('code')} trace={meta.get('trace_id')}"
+                                  + (f" approval={meta['approval_id']}" if meta.get("approval_id") else ""))
+                            print(f"           {meta.get('message', text)}")
+                    else:
+                        result.steps.append(StepRecord(i, action, meta.get("trace_id"), "tool_result", text[:200]))
+                        if verbose:
+                            print(f"[step {i}] tools/call {spec['name']} -> action={action} trace={meta.get('trace_id')}"
+                                  + (" (upstream tool error)" if res.is_error else ""))
+                            print(f"           {text.strip()[:160]}")
+                    if expect == "allow" and blocked:
+                        problems.append(f"step {i}: {spec['name']} expected allow, got {meta.get('code')}")
+                    if expect == "block" and not blocked:
+                        problems.append(f"step {i}: {spec['name']} expected block, was allowed")
+        finally:
+            await client.__aexit__(None, None, None)
+    if problems:
+        result.error = "; ".join(problems)
+    return result
 
 
 def evaluate(scenario: dict[str, Any], result: RunResult, mock_url: str) -> tuple[bool, str]:
@@ -331,18 +452,22 @@ def evaluate(scenario: dict[str, Any], result: RunResult, mock_url: str) -> tupl
             reasons.append(f"answer contains forbidden value: {forbidden}")
     if expect.get("outbox_must_be_empty") and demo_tools.OUTBOX:
         reasons.append(f"outbox is not empty ({len(demo_tools.OUTBOX)} message(s))")
+    if scenario.get("kind") == "mcp" and result.error:
+        reasons.append(result.error)
     return (not reasons), "; ".join(reasons) if reasons else "ok"
 
 
 def run_all(base_url: str, mock_url: str, wait_approval: bool) -> int:
     rows = []
     for scenario in load_scenarios():
-        if scenario.get("kind") == "mcp":
-            rows.append((scenario["id"], "/".join(as_list(scenario["expect"]["outcome"])), "mcp", "SKIP (MCP)"))
+        try:
+            result = run_scenario(
+                scenario, base_url=base_url, mock_url=mock_url, wait_approval=wait_approval, verbose=True
+            )
+        except McpUnavailable as exc:
+            print(f"  {scenario['id']}: skipped, {exc}")
+            rows.append((scenario["id"], "/".join(as_list(scenario["expect"]["outcome"])), "-", "SKIP (MCP not running)"))
             continue
-        result = run_scenario(
-            scenario, base_url=base_url, mock_url=mock_url, wait_approval=wait_approval, verbose=True
-        )
         passed, reason = evaluate(scenario, result, mock_url)
         rows.append(
             (scenario["id"], "/".join(as_list(scenario["expect"]["outcome"])), result.outcome,
@@ -392,10 +517,14 @@ def main(argv: list[str] | None = None) -> int:
             print("scripted mode needs --scenario <id> or --all", file=sys.stderr)
             return 2
         scenario = get_scenario(args.scenario)
-        result = run_scenario(
-            scenario, base_url=args.base_url, mock_url=args.mock_url,
-            wait_approval=args.wait_approval, verbose=True,
-        )
+        try:
+            result = run_scenario(
+                scenario, base_url=args.base_url, mock_url=args.mock_url,
+                wait_approval=args.wait_approval, verbose=True,
+            )
+        except McpUnavailable as exc:
+            print(f"cannot run {scenario['id']}: {exc}", file=sys.stderr)
+            return 2
         passed, reason = evaluate(scenario, result, args.mock_url)
         print(f"\nresult: {result.outcome} | expect: {reason} | {'PASS' if passed else 'FAIL'}")
         return 0 if passed else 1
