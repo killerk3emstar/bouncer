@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from demo.mock_upstream import MockState  # noqa: E402
-from demo.mock_upstream import create_app as create_mock
+from demo.mock_upstream import create_app as create_mock  # noqa: E402
 
 
 class Harness:

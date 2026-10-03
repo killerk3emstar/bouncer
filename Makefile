@@ -63,7 +63,7 @@ eval:
 	$(PY) eval/run_eval.py --layers t1,eval.layers:t0 --datasets bank_ops,deepset_test --out eval_quick
 
 eval-full:
-	$(PY) eval/run_eval.py --layers t1,eval.layers:t0,eval.layers:pipeline,eval.layers:pipeline_tool_result --datasets bank_ops,deepset_test --out eval_layers
+	$(PY) eval/run_eval.py --layers t1,eval.layers:t0,eval.layers:pipeline --datasets bank_ops,deepset_test --out eval_layers
 
 bench:
 	$(PY) scripts/bench.py
