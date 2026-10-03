@@ -38,7 +38,7 @@ Clef-flash (Cloudflare, Apache 2.0), MLX 4-bit, one forward pass answers several
 - On 102 hand-labeled cases (EN, PL): injection AUC 0.996, goal alignment AUC 0.978, exfiltration AUC 0.974; no false positive on 33 benign tool results containing imperative text.
 - Llama Guard 3 1B on the same cases: 0.72 / 0.58 / 0.74.
 - Latency: 1.1 to 2.0 s per decision for states up to about 300 tokens; 3.3 to 4.1 s at about 1000 tokens (grows linearly, about 400 tokens per second). Memory 6.1 GB.
-- In the demo traffic the judge was invoked for a minority of requests (grey zone, non-English text, side-effect tool calls); the dashboard shows the escalation rate live.
+- How often the judge runs depends on the traffic (measured on our benign bank-operations prompts, real T1): 1 of 50 ordinary English prompts (2%), 14 of 38 hard English prompts (37%), and nearly every Polish or German prompt (49 of 50 Polish), because T1 only reads English and non-English text goes to the judge by design (`prompt_injection.escalate_non_english`, can be switched off). A short Polish message costs about 0.6 s of judge time (live test). Every side-effect tool call also goes to the judge (goal alignment). The dashboard shows the escalation rate live.
 
 ## Cost of the checkpoint (slide: performance)
 
