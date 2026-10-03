@@ -118,10 +118,9 @@ def parse_policy(text: str) -> PolicyDoc:
                 {"loc": ".".join(str(p) for p in loc), "line": line, "column": col, "value": value, "message": err["msg"], "type": err["type"]}
             )
         first = errors[0]
-        where = f"{first['loc']}: " if first["loc"] else ""
         more = f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""
         raise PolicyError(
-            f"{where}{first['message']}{more}",
+            f"{first['message']}{more}",
             first["line"],
             errors,
             path=first["loc"] or None,
@@ -238,7 +237,7 @@ class PolicyManager:
                     "diff": self.diff_text(self._current.text, text) if self._current else "",
                 }
             )
-        log.warning("policy reload rejected (line %s): %s", exc.line, exc.message)
+        log.warning("policy reload rejected (%s, line %s): %s", exc.path, exc.line, exc.message)
         if self.on_event:
             self.on_event("policy.reload_failed", dict(self.last_error))
 

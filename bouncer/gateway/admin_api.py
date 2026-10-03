@@ -560,6 +560,51 @@ async def policy(request: Request) -> dict[str, Any]:
     return out
 
 
+class PolicyEdit(BaseModel):
+    source: str
+    expected_version: str | None = None
+
+
+@router.post("/api/policy/validate")
+async def policy_validate(request: Request, body: PolicyEdit) -> dict[str, Any]:
+    from bouncer.policy.compiled import policy_hash
+    from bouncer.policy.loader import PolicyError, parse_policy
+
+    try:
+        doc = parse_policy(body.source)
+    except PolicyError as exc:
+        return {"ok": False, "error": _error_shape(exc.to_dict())}
+    return {"ok": True, "version": policy_hash(body.source), "profile": doc.profile, "mode": doc.defaults.mode}
+
+
+@router.put("/api/policy")
+async def policy_save(request: Request, body: PolicyEdit) -> Any:
+    """Validate, then write the policy file atomically; the normal reload path applies it."""
+    import os
+    import tempfile
+
+    from bouncer.policy.loader import PolicyError, parse_policy
+
+    g = gw(request)
+    current = g.policies.current
+    if body.expected_version and body.expected_version != current.version:
+        return JSONResponse(
+            {"error": {"type": "conflict", "message": f"The policy changed since you opened it (now {current.version}). Reload the page and apply your edit again."}},
+            status_code=409,
+        )
+    try:
+        parse_policy(body.source)
+    except PolicyError as exc:
+        return JSONResponse({"ok": False, "error": _error_shape(exc.to_dict())}, status_code=422)
+    path = g.policies.path
+    fd, tmp = tempfile.mkstemp(prefix=".bouncer-", suffix=".yaml", dir=str(path.parent))
+    with os.fdopen(fd, "w") as fh:
+        fh.write(body.source)
+    os.replace(tmp, path)
+    changed = g.policies.reload()
+    return {"ok": g.policies.last_error is None, "changed": changed, "version": g.policies.current.version, "error": _error_shape(g.policies.last_error) if g.policies.last_error else None}
+
+
 def _error_shape(err: dict[str, Any]) -> dict[str, Any]:
     return {k: err.get(k) for k in ("message", "path", "line", "column", "value", "snippet")}
 

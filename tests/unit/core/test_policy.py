@@ -44,14 +44,14 @@ def test_schema_error_points_to_the_offending_line() -> None:
         parse_policy(bad)
     expected_line = next(i for i, line in enumerate(bad.splitlines(), 1) if "1.7" in line)
     assert exc.value.line == expected_line
-    assert "escalate_above" in exc.value.message
+    assert exc.value.path.endswith("escalate_above")
 
 
 def test_unknown_key_is_rejected() -> None:
     text = POLICY.read_text().replace("  secrets:", "  secretz:", 1)
     with pytest.raises(PolicyError) as exc:
         parse_policy(text)
-    assert "secretz" in exc.value.message
+    assert "secretz" in (exc.value.path or "") + exc.value.message
 
 
 def test_bad_reference_is_rejected() -> None:

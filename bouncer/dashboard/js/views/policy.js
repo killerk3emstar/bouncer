@@ -104,7 +104,7 @@ export default {
       }
       const failed = p && p.reload && p.reload.status === 'failed';
       el.innerHTML = String(html`
-        <div class="view-head"><h1>Policy</h1><span class="sub">${p ? p.path : ''} · read-only; edit the file, the gateway reloads it within about a second</span></div>
+        <div class="view-head"><h1>Policy</h1><span class="sub">${p ? p.path : ''} · edit the file or use the editor below; the gateway reloads it within about a second</span></div>
         ${p ? html`<div class="card" style="margin-bottom:12px"><dl class="facts">
           <div><dt>Active version</dt><dd class="mono">${p.version} <button type="button" class="btn btn-small" data-copy="${p.version}">Copy</button></dd></div>
           <div><dt>Profile</dt><dd>${p.profile}</dd></div>
@@ -133,7 +133,17 @@ export default {
             <div class="diff">${diff}</div>
           </div>
         <details class="card"><summary class="strong" style="cursor:pointer">Active policy source${p ? html` <span class="mono hint">${shortHash(p.version)}</span>` : ''}</summary>
-          <div class="diff" style="margin-top:8px;max-height:none">${sourceHtml(p && p.source)}</div></details>`);
+          <div class="diff" style="margin-top:8px;max-height:none">${sourceHtml(p && p.source)}</div></details>
+        <details class="card" style="margin-top:12px" ${st.editOpen ? 'open' : ''} data-editor><summary class="strong" style="cursor:pointer">Edit policy <span class="hint">validated before it is written; an invalid file is never applied</span></summary>
+          <textarea class="mono" data-policy-src spellcheck="false" style="width:100%;min-height:420px;margin-top:8px;font-size:12px;line-height:1.45">${st.draft != null ? st.draft : (p && p.source) || ''}</textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <button type="button" class="btn" data-act="validate">Validate</button>
+            <button type="button" class="btn btn-primary" data-act="save">Save and apply</button>
+            <button type="button" class="btn" data-act="reset">Discard changes</button>
+            <span data-edit-msg class="hint">${st.editMsg || ''}</span>
+          </div>
+          ${st.editErr ? html`<div class="notice notice-error" style="margin-top:8px">${reloadErrorDetail(st.editErr)}</div>` : ''}
+        </details>`);
     };
 
     el.addEventListener('change', (e) => {
@@ -141,7 +151,46 @@ export default {
       if (e.target.name === 'vb') st.bi = Number(e.target.value);
       render();
     });
+    el.addEventListener('input', (e) => {
+      if (e.target.matches('[data-policy-src]')) st.draft = e.target.value;
+    });
+    el.addEventListener('toggle', (e) => {
+      if (e.target.matches('[data-editor]')) st.editOpen = e.target.open;
+    }, true);
     el.addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]');
+      if (act) {
+        const ta = el.querySelector('[data-policy-src]');
+        const source = ta ? ta.value : '';
+        st.draft = source;
+        st.editOpen = true;
+        if (act.dataset.act === 'reset') { st.draft = null; st.editErr = null; st.editMsg = ''; render(); return; }
+        try {
+          if (act.dataset.act === 'validate') {
+            const r = await api('/api/policy/validate', { method: 'POST', body: { source } });
+            st.editErr = r.ok ? null : r.error;
+            st.editMsg = r.ok ? `Valid. Would become ${shortHash(r.version)} (profile ${r.profile}, mode ${r.mode}).` : 'Not valid; nothing was written.';
+          } else {
+            const r = await api('/api/policy', { method: 'PUT', body: { source, expected_version: st.pol && st.pol.version } });
+            st.editErr = r.error || null;
+            st.editMsg = r.changed ? `Saved and applied: now ${shortHash(r.version)}.` : (r.ok ? 'No change.' : 'Not applied.');
+            if (r.changed) {
+              st.draft = null;
+              const [pol, vers] = await Promise.all([api('/api/policy'), api('/api/policy/versions')]);
+              st.pol = pol;
+              st.versions = vers.versions || [];
+              st.bi = 0;
+              st.ai = Math.min(1, st.versions.length - 1);
+            }
+          }
+        } catch (err) {
+          const body = err && err.body;
+          st.editErr = body && body.error && body.error.line !== undefined ? body.error : null;
+          st.editMsg = st.editErr ? 'Not valid; nothing was written.' : (err.message || 'Request failed');
+        }
+        render();
+        return;
+      }
       const b = e.target.closest('[data-copy]');
       if (!b) return;
       try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch (_) { b.textContent = 'Copy failed'; }

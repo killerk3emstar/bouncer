@@ -166,3 +166,22 @@ def test_selftest_runner_does_not_touch_process_keys(tmp_path: Path) -> None:
     res = asyncio.run(runner.run_case(case))
     assert res.passed, res.failures
     assert os.environ["BOUNCER_KEY_OPS_COPILOT"] == "bk_real_key_of_the_live_gateway"
+
+
+def test_policy_edit_validates_then_writes(env) -> None:  # noqa: ANN001
+    app, _, policy = env
+    gw = app.state.gw
+    src = policy.read_text()
+
+    async def call(method: str, path: str, body: dict) -> httpx.Response:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.request(method, path, json=body)
+
+    bad = asyncio.run(call("PUT", "/api/policy", {"source": src.replace("EMAIL: redact", "EMAIL: maybe", 1)}))
+    assert bad.status_code == 422 and bad.json()["error"]["line"]
+    assert policy.read_text() == src  # nothing written
+    stale = asyncio.run(call("PUT", "/api/policy", {"source": src, "expected_version": "sha256:old"}))
+    assert stale.status_code == 409
+    ok = asyncio.run(call("PUT", "/api/policy", {"source": src.replace("EMAIL: redact", "EMAIL: block", 1), "expected_version": gw.policies.current.version}))
+    assert ok.status_code == 200 and ok.json()["changed"] is True
+    assert gw.policies.current.doc.controls.pii.entities["EMAIL"] == "block"
