@@ -18,7 +18,9 @@ responses:
   - content: Summary of fees, limits and KYC rules for new joiners.
     usage: {prompt_tokens: 4000, completion_tokens: 1000}
 expect:
-  outcome: blocked
+  # blocked by tokens per minute, or (when today's USD budget was already spent by earlier runs; spend is
+  # rebuilt from the audit log after a restart) downgraded to the local model first
+  outcome: [blocked, downgraded]
   code: ["budgets.*"]
   stop_step: [1, 2, 3]
   steps:
