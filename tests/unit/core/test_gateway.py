@@ -197,3 +197,19 @@ def test_audit_never_holds_unredacted_tool_arguments(env) -> None:  # noqa: ANN0
     assert secret not in json.dumps(ev)
     for appr in app.state.gw.store.list_approvals():
         assert secret not in appr.arguments_masked
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"model": "gpt-4o-mini", "messages": ["hello", 5]},
+        {"model": "gpt-4o-mini", "messages": [{"content": "no role"}]},
+        {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hi"}], "tools": "x"},
+        [1, 2, 3],
+    ],
+)
+def test_malformed_requests_get_400_not_500(env, body) -> None:  # noqa: ANN001
+    app, _, _ = env
+    r = asyncio.run(_post(app, body))
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["type"] == "invalid_request_error"

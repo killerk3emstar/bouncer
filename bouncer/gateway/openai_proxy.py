@@ -158,6 +158,11 @@ async def chat_completions(request: Request) -> Any:
         return JSONResponse(error_body("request.invalid_json", "Request body is not valid JSON.", None, etype="invalid_request_error"), status_code=400)
     if not isinstance(body, dict) or not isinstance(body.get("messages"), list):
         return JSONResponse(error_body("request.invalid", "Body must be a JSON object with a messages list.", None, etype="invalid_request_error"), status_code=400)
+    bad = next((i for i, m in enumerate(body["messages"]) if not isinstance(m, dict) or not isinstance(m.get("role"), str)), None)
+    if bad is not None:
+        return JSONResponse(error_body("request.invalid", f"messages[{bad}] must be an object with a role.", None, etype="invalid_request_error"), status_code=400)
+    if body.get("tools") is not None and not (isinstance(body["tools"], list) and all(isinstance(t, dict) for t in body["tools"])):
+        return JSONResponse(error_body("request.invalid", "tools must be a list of objects.", None, etype="invalid_request_error"), status_code=400)
     return await handle_chat(g, principal, body, request.headers.get("x-bouncer-session"), route="openai.chat")
 
 

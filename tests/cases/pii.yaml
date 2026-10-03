@@ -277,3 +277,44 @@
   policy_patch: {controls: {pii: {entities: {EMAIL: null}}}}
   request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply to jan.kowalski@mailbox.example about the statement."}]}
   expect: {action: allow, no_findings: [pii], upstream_must_contain: ["jan.kowalski@mailbox.example"]}
+
+- id: pii-allow-order-number-grouped-like-phone
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "Red-team P1-FP-2: a grouped 9-digit number after 'order number' is an id, not a phone."
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "customer order number is 600 123 456, please check the status"}]}
+  expect: {action: allow, no_findings: [pii], upstream_must_contain: ["600 123 456"]}
+
+- id: pii-allow-polish-order-number-grouped-like-phone
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Numer zamówienia 600-123-456 nie dotarł do magazynu, sprawdź status."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-grouped-number-without-phone-context
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Batch 601 222 333 was reconciled on Monday."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-redact-grouped-phone-with-context
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Please call me back at 600 123 456 after 5 pm about my order."}]}
+  expect: {action: redact, findings: [pii.PHONE], upstream_must_not_contain: ["600 123 456"]}
+
+- id: pii-redact-polish-phone-with-context
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Klient prosi o kontakt, numer telefonu 22 123 45 67."}]}
+  expect: {action: redact, findings: [pii.PHONE], upstream_must_not_contain: ["22 123 45 67"]}

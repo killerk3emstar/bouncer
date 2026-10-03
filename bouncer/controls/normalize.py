@@ -198,11 +198,27 @@ def _strip_marks(text: str) -> str:
     return unicodedata.normalize("NFC", stripped).translate(_EXTRA_FOLD)
 
 
-def _fold_homoglyphs(text: str) -> tuple[str, list[str]]:
-    """Fold lookalike letters to Latin inside words that are Latin or entirely made of lookalikes.
+_UNIT_SYMBOLS = frozenset("μΩω")  # micro and ohm in units (5μm, 10kΩ) are not lookalike attacks
 
-    Real Cyrillic or Greek words (which contain letters with no Latin twin) are left alone.
-    Returns (folded text, list of mixed-script words as they appeared).
+
+_LOOKALIKE_SCRIPTS = ("CYRILLIC", "GREEK", "ARMENIAN", "CHEROKEE", "COPTIC", "LISU", "GEORGIAN")
+
+
+def _non_latin_letter(c: str) -> bool:
+    """A letter from a script with Latin lookalikes. CJK, Thai and other scripts written without spaces mix
+    with Latin brand names legitimately ("iPhone用"), so they do not count."""
+    if c.isascii() or not c.isalpha():
+        return False
+    return unicodedata.name(c, "").startswith(_LOOKALIKE_SCRIPTS)
+
+
+def _fold_homoglyphs(text: str) -> tuple[str, list[str]]:
+    """Fold lookalike letters to Latin, per character.
+
+    A word with Latin letters gets every known lookalike folded, even when it also holds letters that have
+    no Latin twin ("ignгre" keeps the г but any Cyrillic о or е in it are folded). A word written entirely
+    in lookalikes is folded too. Real Cyrillic or Greek words (letters with no Latin twin, no Latin letters)
+    are left alone. Returns (folded text, mixed-script words as they appeared).
     """
     if text.isascii():
         return text, []
@@ -212,15 +228,14 @@ def _fold_homoglyphs(text: str) -> tuple[str, list[str]]:
         w = m.group()
         if w.isascii():
             return w
-        has_conf = any(c in _CONFUSABLES for c in w)
-        if not has_conf:
-            return w
         has_ascii = any(c.isascii() for c in w)
-        all_conf = all(c.isascii() or c in _CONFUSABLES for c in w)
-        if has_ascii and all_conf:
-            mixed.append(w)
-            return w.translate(_CONFUSABLE_TABLE)
-        if all_conf and len(w) >= 2:
+        if has_ascii:
+            foreign = [c for c in w if c in _CONFUSABLES or _non_latin_letter(c)]
+            if foreign and not (len(w) <= 4 and all(c in _UNIT_SYMBOLS for c in foreign)):
+                mixed.append(w)
+                return w.translate(_CONFUSABLE_TABLE)
+            return w
+        if len(w) >= 2 and all(c in _CONFUSABLES for c in w):
             return w.translate(_CONFUSABLE_TABLE)
         return w
 
@@ -563,9 +578,9 @@ def prepare(segment: Segment, cfg: ObfuscationCfg | None) -> tuple[str, list[Vie
                 "mixed-script-homoglyphs",
                 Action.LOG,
                 "medium",
-                f"{len(mixed)} word(s) mix Latin letters with Cyrillic, Greek or other lookalike letters "
-                f"(read as: {sample}). Lookalike letters are used to slip blocked words past filters; the text was "
-                "scanned in its folded form.",
+                f"{len(mixed)} word(s) mix Latin letters with Cyrillic, Greek or other non-Latin letters "
+                f"(read as: {sample}). Mixed scripts inside one word are used to slip blocked words past filters; "
+                "the text was scanned with known lookalikes folded and near-miss spellings matched.",
                 evidence=sample,
             )
         )

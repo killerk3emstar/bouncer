@@ -168,8 +168,41 @@ _PHONE_RE = re.compile(
     r")(?![\w])(?![.,]\d)"
 )
 _PHONE_CONTEXT_RE = re.compile(
-    r"(?i)(?:\btel\b|\btel\.|phone|telefon|mobile|kom\.|komork|komórk|\bcall\b|zadzwo|sms|whatsapp|fax|numer\s+kontaktowy|contact)[^\n]{0,24}$"
+    r"(?i)(?:\btel\b|\btel\.|\btelephone|\bphone|\btelefon\w*|\bmobile\b|\bcell\b|\bkom\.|\bkomork\w*|\bkomórk\w*|"
+    r"\bcall\b|\bcalls?\s+(?:me|us|him|her|them)|\bring\b|\btext\s+(?:me|us)|\breach\s+(?:me|us|him|her)|\bdial\b|"
+    r"\bzadzwo\w*|\bdzwo\w*|\boddzwo\w*|\bsms\b|\bwhatsapp\b|\bsignal\b|\bfax\b|\bhotline\b|\binfolinia\w*|"
+    r"\bnumer\w*\s+(?:kontaktow\w*|telefon\w*|komórk\w*|komork\w*)|\bnr\.?\s*tel|\bmy number|\bmój numer|\bmoj numer|"
+    r"\bcontact\s*(?:number|no\.?|details|me|us)?)"
 )
+# Identifier context: a grouped number right after these words is an order, invoice or case number.
+_ID_CONTEXT_RE = re.compile(
+    r"(?i)(?:\border|\bzamówieni\w*|\bzamowieni\w*|\breference|\bref\b\.?|\bticket|\binvoice|\bfaktur\w*|"
+    r"\bcase\b|\bsprawy\b|\bsprawa\b|\bzgłoszeni\w*|\bzgloszeni\w*|\btracking|\bprzesyłk\w*|\bprzesylk\w*|\bparcel|"
+    r"\bshipment|\bpo\b|\bpurchase|\btransaction|\btransakcj\w*|\bcontract|\bumow\w*|\bpolicy|\bpolis\w*|"
+    r"\bcustomer\s+(?:id|no|number)|\bclient\s+(?:id|no|number)|\bnumer\s+klienta|\bid\b|\bsku\b|\bserial|"
+    r"\bbatch|\bpartia|\bdocument|\bdokument\w*|\baccount\s+(?:id|no|number)|\bloan|\bkredyt\w*|\bclaim|\bszkod\w*)"
+)
+_INTL_RE = re.compile(r"^(?:\+|00)")
+_PAREN_RE = re.compile(r"^\(")
+
+
+def _phone_context(before: str, after: str) -> bool:
+    """True when the nearest cue before the number says phone (and no closer cue says order/invoice id)."""
+    pos = [m.end() for m in _PHONE_CONTEXT_RE.finditer(before)]
+    neg = [m.end() for m in _ID_CONTEXT_RE.finditer(before)]
+    if pos and (not neg or pos[-1] > neg[-1]):
+        return True
+    if re.match(r"^\s*\((?:tel|phone|mobile|cell|kom|komórka|komorka|fax)\b", after, re.I):
+        return True
+    return False
+
+
+def _id_context(before: str) -> bool:
+    pos = [m.end() for m in _PHONE_CONTEXT_RE.finditer(before)]
+    neg = [m.end() for m in _ID_CONTEXT_RE.finditer(before)]
+    return bool(neg) and (not pos or neg[-1] > pos[-1])
+
+
 _AMOUNT_AFTER_RE = re.compile(r"^\s?(?:zł|zl|pln|eur|usd|gbp|chf|\$|€|£|k\b|mln|tys)", re.I)
 _AMOUNT_BEFORE_RE = re.compile(r"(?i)(?:\$|€|£|pln|eur|usd|kwot\w*|amount|total|suma|saldo|balance|price|cena)\s*[:=]?\s*$")
 
@@ -217,15 +250,19 @@ class PiiControl(Control):
                 d = _digits(v)
                 if not 9 <= len(d) <= 15:
                     continue
-                before = text[max(0, m.start() - 40) : m.start()]
-                after = text[m.end() : m.end() + 6]
+                before = text[max(0, m.start() - 48) : m.start()]
+                after = text[m.end() : m.end() + 16]
                 if _AMOUNT_AFTER_RE.match(after) or _AMOUNT_BEFORE_RE.search(before):
                     continue
-                intl = v.startswith("+") or v.startswith("00")
-                if v.isdigit() and not _PHONE_CONTEXT_RE.search(before):
-                    continue  # a bare 9-digit number is an id or amount unless the text says it is a phone
-                if intl and v.startswith("00") and not _PHONE_CONTEXT_RE.search(before) and " " not in v and "-" not in v:
-                    continue
+                if _INTL_RE.match(v):
+                    # +48 600 123 456 is a phone without further context; a compact 0048600123456 needs context
+                    if v.startswith("00") and v.isdigit() and not _phone_context(before, after):
+                        continue
+                elif _PAREN_RE.match(v):
+                    if _id_context(before):
+                        continue  # (22) 123 45 67 layout is a phone unless the text calls it an id
+                elif not _phone_context(before, after):
+                    continue  # 600 123 456 / 600123456 / 555-123-4567 are ids or amounts unless the text says phone
                 cands.append(PiiHit("PHONE", m.start(1), m.end(1), v))
         if "EMAIL" in want and "@" in text:
             for m in _EMAIL_RE.finditer(text):

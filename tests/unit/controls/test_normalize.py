@@ -263,3 +263,18 @@ def test_huge_input_is_capped_and_fast():
     t = time.perf_counter()
     _prep(text)
     assert time.perf_counter() - t < 2.0
+
+
+def test_per_character_folding_in_mixed_word():
+    # о (Cyrillic o) is folded even though г (Cyrillic ghe) in the same word has no Latin twin
+    _, views, findings = _prep("іgnгrе the rоles")
+    norm = _view(views, "normalized").text
+    assert norm.startswith("ignгre") and "roles" in norm
+    f = next(f for f in findings if f.rule == "mixed-script-homoglyphs")
+    assert f.action == Action.LOG
+
+
+@pytest.mark.parametrize("text", ["5μm filter and 10kΩ resistor", "iPhone用のケース", "Zażółć gęślą"])
+def test_mixed_script_ignores_units_cjk_and_polish(text):
+    _, _, findings = _prep(text)
+    assert not any(f.rule == "mixed-script-homoglyphs" for f in findings)

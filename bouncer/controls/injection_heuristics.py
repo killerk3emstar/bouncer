@@ -398,6 +398,36 @@ PATTERNS: list[Pattern] = [
         ("zeig", "gib", "nenne", "wiederhole", "verrate", "schreibe", "drucke"),
         atlas=("AML.T0056",),
     ),
+    # ---- claimed authority
+    Pattern(
+        "authority-claim", "claimed authority used to unlock a privileged mode", "high",
+        _c(
+            r"\b(?:i am|i'm|im|i m|this is|speaking as|as)\s+(?:the |your |an? |one of (?:the|your) )?"
+            r"(?:lead |senior |chief |head |system |site |root |super ?|main |real |actual )?"
+            r"(?:developer|developers|dev|admin|administrator|sysadmin|operator|owner|creator|maker|engineer|"
+            r"programmer|root user|superuser|security team|it department|it team|openai|anthropic|model provider)\b"
+            r"[^\n]{0,80}?(?:[,.;:!]|\band\b|\bso\b|\bnow\b|\bplease\b)\s*(?:(?:please|now|just|immediately|then)\s+)*"
+            r"(?:(?:enter|switch (?:to|into)|go into|boot into|drop into)\s+(?:the |your )?[a-z-]+ mode\b"
+            r"|(?:enable|activate|turn on|unlock|start)\s+(?:your\s+[a-z-]+|(?:the )?(?:god|sudo|root|admin|administrator|"
+            r"unrestricted|jailbreak|dan|override|superuser|unfiltered)) mode\b"
+            r"|(?:show|reveal|print|dump|display|give|tell|output|export|send)\s+(?:me\s+|us\s+)?(?:the |your |all )?"
+            r"(?:(?:hidden|secret|internal|system|raw|full|complete|private)\s+(?:config|configuration|prompt|instructions|"
+            r"settings)|system prompt)\b"
+            r"|(?:disable|turn off|bypass|remove|lift|drop|ignore|deactivate|skip|switch off)\s+(?:the |your |all |any )?"
+            r"(?:safety |content |security )?(?:filters?|restrictions|guardrails|safety(?: checks| rules| guidelines| filters)?|"
+            r"safeguards|content polic(?:y|ies)|moderation))"
+            r"|\bjestem (?:twoim |waszym |tutaj |tu )?(?:glownym |naczelnym )?(?:administratorem|adminem|deweloperem|"
+            r"developerem|programista|tworca|wlascicielem|operatorem|inzynierem|z (?:dzialu|zespolu) (?:it|bezpieczenstwa))\b"
+            r"[^\n]{0,80}?(?:[,.;:!]|\bwiec\b|\bi\b|\bteraz\b|\bprosze\b)\s*(?:(?:prosze|teraz|natychmiast)\s+)*"
+            r"(?:(?:wlacz|aktywuj|uruchom|przejdz (?:w|do|na)|wejdz w|przelacz (?:sie )?(?:w|na))\s+tryb\b"
+            r"|(?:pokaz|wyswietl|podaj|ujawnij|wypisz|wyslij)\s+(?:mi\s+)?(?:swoj\w* |twoj\w* )?(?:ukryt\w+|wewnetrzn\w+|"
+            r"systemow\w+|pel\w+|cal\w+)\s+(?:konfiguracj\w+|ustawieni\w+|instrukcj\w+|prompt\w*)"
+            r"|(?:wylacz|dezaktywuj|pomin|obejdz|usun|zdejmij)\s+(?:swoje |twoje |wszystkie )?(?:filtry|ograniczenia|"
+            r"zabezpieczenia|blokady|moderacj\w+))"
+        ),
+        ("i am", "i'm", "im ", "i m ", "this is", "speaking as", "as ", "jestem"),
+        atlas=("AML.T0054",),
+    ),
     # ---- jailbreak personas
     Pattern(
         "jailbreak-persona", "jailbreak persona (DAN family)", "high",
@@ -422,6 +452,8 @@ PATTERNS: list[Pattern] = [
             r"|\b(?:chatgpt|gpt|the assistant|an ai|ai|llm|model|assistant)\s+(?:with|in)\s+(?:developer|god|jailbreak|dan)"
             r" mode\b"
             r"|\b(?:developer|jailbreak|dan) mode (?:output|response|enabled\W{0,3}(?:you|chatgpt|gpt))\b"
+            r"|\b(?:enable|activate|enter|switch to|turn on|unlock)\s+your\s+(?:debug|debugging|developer|dev|admin|"
+            r"maintenance|god|sudo|root|diagnostic|unrestricted|test|override|service) mode\b"
             r"|\b(?:enable|activate|enter|switch to|turn on|unlock)\s+(?:the\s+)?(?:dan|jailbreak|god|unrestricted|"
             r"unfiltered|uncensored|evil|chaos|opposite) mode\b"
         ),
@@ -569,6 +601,99 @@ PATTERNS: list[Pattern] = [
 ]
 
 
+# ---- letters run together ("i g n o r e a l l p r e v i o u s ..." collapses to one token)
+_SQ_STRONG = r"(?:all|any|every|previous|prior|earlier|preceding|above|system|initial|original|your)"
+_SQ_QUAL = r"(?:all|any|every|the|your|of|previous|prior|earlier|preceding|above|system|initial|original|these|those)"
+_SQ_OBJ = (
+    r"(?:instructions?|directives?|rules|guidelines|prompts?|commands|programming|guardrails|restrictions|context|"
+    r"systemprompt|systemmessage)"
+)
+SQUASHED: list[Pattern] = [
+    Pattern(
+        "ignore-previous", "instruction override (letters run together)", "high",
+        re.compile(rf"(?:ignore|disregard|forget|bypass|override)(?P<q>{_SQ_QUAL}{{1,4}}){_SQ_OBJ}"),
+        ("ignore", "disregard", "forget", "bypass", "override"),
+        validate=lambda m: re.search(_SQ_STRONG, m.group("q")) is not None,
+    ),
+    Pattern(
+        "prompt-leak", "system prompt extraction (letters run together)", "medium",
+        re.compile(
+            r"(?:reveal|print|show|repeat|output|display|dump|leak)(?:me|us)?(?:your|the)(?:full|entire|whole|exact|"
+            r"original|initial|hidden|secret)?(?:systemprompt|systemmessage|initialinstructions|instructions|prompt)"
+            r"|repeat(?:everything|allthetext|thetext|thewords|allthewords)(?:above|beforethis|sofar)"
+        ),
+        ("reveal", "print", "show", "repeat", "output", "display", "dump", "leak"),
+        atlas=("AML.T0056",),
+    ),
+    Pattern(
+        "ignore-previous-pl", "instruction override (Polish, letters run together)", "high",
+        re.compile(
+            r"(?:zignoruj|ignoruj|pomin|zapomnijo|zapomnij)(?:wszystkie|wszystkich|poprzednie|poprzednich|wczesniejsze|"
+            r"wczesniejszych|swoje|twoje|systemowe|dotychczasowe){1,3}(?:polecenia|polecen|instrukcje|instrukcji|"
+            r"instrukcjach|zasady|zasad|reguly)"
+        ),
+        ("ignoruj", "pomin", "zapomnij"),
+    ),
+    Pattern(
+        "prompt-leak-pl", "system prompt extraction (Polish, letters run together)", "medium",
+        re.compile(r"(?:pokaz|wyswietl|podaj|ujawnij|wypisz)(?:swoj|twoj)?(?:promptsystemowy|systemowyprompt|instrukcjesystemowe)"),
+        ("pokaz", "wyswietl", "podaj", "ujawnij", "wypisz"),
+        atlas=("AML.T0056",),
+    ),
+]
+_LONG_TOKEN_RE = re.compile(r"[a-z]{14,}")
+
+# ---- near-miss spellings of the key words: scrambled inner letters (typoglycemia: "ignroe", "insturctions")
+# or one letter replaced by a non-Latin character ("ignгre"). Only these words are corrected.
+FUZZY_KEYWORDS = (
+    "ignore", "disregard", "forget", "previous", "instructions", "instruction", "directives", "guidelines",
+    "system", "prompt", "reveal", "override", "bypass", "zignoruj", "poprzednie", "poprzednich", "wczesniejsze",
+    "wczesniejszych", "polecenia", "instrukcje", "instrukcji", "systemowy", "anweisungen", "vorherigen",
+)
+_FUZZY_SET = frozenset(FUZZY_KEYWORDS)
+_FUZZY_KEYS = {(k[0], k[-1], len(k)): [] for k in FUZZY_KEYWORDS}
+for _k in FUZZY_KEYWORDS:
+    _FUZZY_KEYS[(_k[0], _k[-1], len(_k))].append(_k)
+_FUZZY_BY_LEN: dict[int, list[str]] = {}
+for _k in FUZZY_KEYWORDS:
+    _FUZZY_BY_LEN.setdefault(len(_k), []).append(_k)
+_FUZZY_WORD_RE = re.compile(r"[^\W\d_]{5,}")
+
+
+def _fuzzy_word(w: str) -> str | None:
+    if w in _FUZZY_SET:
+        return None
+    if w.isascii():
+        cands = _FUZZY_KEYS.get((w[0], w[-1], len(w)))
+        if cands:
+            sw = sorted(w)
+            for k in cands:
+                if sorted(k) == sw:
+                    return k
+        return None
+    for k in _FUZZY_BY_LEN.get(len(w), ()):
+        diff = [(a, b) for a, b in zip(w, k, strict=True) if a != b]
+        if len(diff) == 1 and not diff[0][0].isascii():
+            return k
+    return None
+
+
+def fuzzy_canonical(norm: str) -> str | None:
+    """The normalized text with near-miss key words corrected, or None when nothing changed."""
+    changed = False
+
+    def fix(m: re.Match[str]) -> str:
+        nonlocal changed
+        k = _fuzzy_word(m.group())
+        if k is None:
+            return m.group()
+        changed = True
+        return k
+
+    out = _FUZZY_WORD_RE.sub(fix, norm)
+    return out if changed else None
+
+
 class InjectionHeuristicsControl(Control):
     id = "prompt_injection"
     owasp_llm = ["LLM01"]
@@ -589,11 +714,28 @@ class InjectionHeuristicsControl(Control):
         raw = text[:MAX_SCAN_CHARS].casefold()
         out: list[tuple[Pattern, str]] = []
         seen: set[str] = set()
-        for p, m, _src in self._iter(norm, raw, role):
+        for p, m, _src in self._iter_all(norm, raw, role):
             if p.id not in seen:
                 seen.add(p.id)
                 out.append((p, m.group(0)))
         return out
+
+    def _iter_all(self, norm: str | None, raw: str | None, role: str):  # noqa: ANN202
+        """Normal patterns, then near-miss spellings corrected, then run-together tokens."""
+        yield from self._iter(norm, raw, role)
+        if not norm:
+            return
+        canon = fuzzy_canonical(norm)
+        if canon is not None:
+            for p, m, _src in self._iter(canon, None, role):
+                yield p, m, "fuzzy"
+        for tok in _LONG_TOKEN_RE.findall(norm):
+            for p in SQUASHED:
+                if not any(k in tok for k in p.keywords):
+                    continue
+                m = p.regex.search(tok)
+                if m is not None and (p.validate is None or p.validate(m)):
+                    yield p, m, "squashed"
 
     def _iter(self, norm: str | None, raw: str | None, role: str):  # noqa: ANN202
         for p in PATTERNS:
@@ -632,7 +774,7 @@ class InjectionHeuristicsControl(Control):
                 t = v.text[:MAX_SCAN_CHARS]
                 texts.append((normalize_text(t).replace("_", " "), t.casefold(), v.kind, v.span))
         for norm_t, raw_t, view_kind, span in texts:
-            for p, m, src in self._iter(norm_t, raw_t, role):
+            for p, m, src in self._iter_all(norm_t, raw_t, role):
                 if p.id in seen:
                     continue
                 seen.add(p.id)
@@ -641,8 +783,15 @@ class InjectionHeuristicsControl(Control):
                     fspan = (m.start(), m.end())
                 elif view_kind != "raw":
                     fspan = span
-                findings.append(self._finding(segment, p, m.group(0), view_kind if view_kind != "raw" else (
-                    "raw" if src == "raw" else "normalized"), fspan))
+                if view_kind != "raw":
+                    fview = view_kind
+                elif src == "raw":
+                    fview = "raw"
+                elif src in ("fuzzy", "squashed"):
+                    fview = f"normalized:{src}"
+                else:
+                    fview = "normalized"
+                findings.append(self._finding(segment, p, m.group(0), fview, fspan))
         return findings
 
     def _finding(self, segment: Segment, p: Pattern, matched: str, view: str, span: tuple[int, int] | None) -> Finding:
@@ -657,8 +806,10 @@ class InjectionHeuristicsControl(Control):
         how = ""
         if view.startswith("decoded:"):
             how = f" after decoding ({view.split(':', 1)[1]})"
-        elif view == "normalized":
-            how = ""
+        elif view == "normalized:fuzzy":
+            how = " after correcting scrambled or substituted letters"
+        elif view == "normalized:squashed":
+            how = " in letters written without word gaps"
         snippet = " ".join(matched.split())
         if len(snippet) > 80:
             snippet = snippet[:77] + "..."
@@ -676,7 +827,8 @@ class InjectionHeuristicsControl(Control):
         msg = f"Prompt injection pattern ({p.family}) in {where}{how}: '{snippet}'. {verdict[0].upper()}{verdict[1:]}. {advice}"
         atlas = list(p.atlas) or []
         atlas.insert(0, ATLAS_INDIRECT if role in UNTRUSTED_ROLES else ATLAS_DIRECT)
-        agentic = ["ASI01", "ASI06"] if role == "tool_definition" else ["ASI01"]
+        # A poisoned tool definition is a supply-chain risk (the tool comes from a third-party server).
+        agentic = ["ASI01", "ASI04"] if role == "tool_definition" else ["ASI01"]
         return Finding(
             control=self.id,
             rule=f"heuristic.{p.id}",
