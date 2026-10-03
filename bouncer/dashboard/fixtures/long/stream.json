@@ -1,0 +1,372 @@
+{
+  "events": [
+    {
+      "ts": "2026-10-04T05:28:30.045Z",
+      "seq": 123,
+      "trace_id": "tr_01K6AJ7P9HYWRTGKVWDQRQS1TJ",
+      "prev_hash": "7cb15382fe7e1a101709a806b4a45dabb32fd88b54853c05bcf9f2f592125d44",
+      "hash": "2481e1bdd42ecb65d8e5461f69244dbb241b2a840637bcd1dcf8bba7e110851c",
+      "type": "decision",
+      "principal": {
+        "id": "dev-assistant-with-a-very-long-service-account-name-for-testing",
+        "team": "operations-and-customer-servicing-emea-region"
+      },
+      "session_id": "ses_86f3377d1841",
+      "route": "openai.chat",
+      "direction": "input",
+      "model": "hf.co/some-organization/very-long-model-name-instruct-2026-q4-gguf:Q4_K_M",
+      "upstream": "ollama",
+      "action": "allow",
+      "enforced": true,
+      "status_code": 200,
+      "findings": [],
+      "judge": {
+        "invoked": false,
+        "reason": null,
+        "backend": null,
+        "answers": {},
+        "latency_ms": 0,
+        "cached": false
+      },
+      "latency_ms": {
+        "t0": 1.16,
+        "t1": 22.1,
+        "t2": 0.0,
+        "upstream": 1913.6,
+        "gateway_overhead": 25.3,
+        "total": 1938.9
+      },
+      "usage": {
+        "prompt_tokens": 208,
+        "completion_tokens": 366,
+        "cost_usd": 0.002101,
+        "gpu_seconds": 1.91,
+        "budget_left_usd": null
+      },
+      "policy": {
+        "version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+        "profile": "balanced",
+        "mode": "enforce"
+      },
+      "tool": null,
+      "message": null,
+      "approval_id": null,
+      "excerpt": "UnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbr"
+    },
+    {
+      "ts": "2026-10-04T05:24:18.650Z",
+      "seq": 122,
+      "trace_id": "tr_01K6GYXS9YT205TRHY8ZNK1WSY",
+      "prev_hash": "a8f60ae0ad36b3a1c69096cdb53903472fb1c3ee7c92e1958ff65104b61f88ea",
+      "hash": "7cb15382fe7e1a101709a806b4a45dabb32fd88b54853c05bcf9f2f592125d44",
+      "type": "decision",
+      "principal": {
+        "id": "dev-assistant-with-a-very-long-service-account-name-for-testing",
+        "team": "operations-and-customer-servicing-emea-region"
+      },
+      "session_id": "ses_d802db700395",
+      "route": "openai.chat",
+      "direction": "output",
+      "model": "hf.co/some-organization/very-long-model-name-instruct-2026-q4-gguf:Q4_K_M",
+      "upstream": "commercial-mock",
+      "action": "redact",
+      "enforced": true,
+      "status_code": 200,
+      "findings": [
+        {
+          "control": "secrets",
+          "rule": "github-pat-extremely-long-rule-identifier-from-a-custom-plugin-v2",
+          "tier": "T0",
+          "severity": "high",
+          "score": 1.0,
+          "action": "redact",
+          "span": [
+            96,
+            136
+          ],
+          "evidence": "ghp_****************************Xk2QZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+          "reason": "GitHub personal access token (ghp_ + 36 chars) in model output. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. ",
+          "owasp_llm": [
+            "LLM02"
+          ],
+          "owasp_agentic": [
+            "ASI03"
+          ],
+          "atlas": [
+            "AML.T0057"
+          ],
+          "signature_id": null
+        },
+        {
+          "control": "secrets",
+          "rule": "high-entropy-extremely-long-rule-identifier-from-a-custom-plugin-v2",
+          "tier": "T0",
+          "severity": "low",
+          "score": 0.62,
+          "action": "log",
+          "span": [
+            190,
+            222
+          ],
+          "evidence": "Zm9v************************YmFyZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+          "reason": "High-entropy string (4.4 bits/char, 32 chars) without a known prefix; logged only. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. ",
+          "owasp_llm": [
+            "LLM02"
+          ],
+          "owasp_agentic": [
+            "ASI03"
+          ],
+          "atlas": [
+            "AML.T0057"
+          ],
+          "signature_id": null
+        }
+      ],
+      "judge": {
+        "invoked": false,
+        "reason": null,
+        "backend": null,
+        "answers": {},
+        "latency_ms": 0,
+        "cached": false
+      },
+      "latency_ms": {
+        "t0": 0.49,
+        "t1": 0.0,
+        "t2": 0.0,
+        "upstream": 1630.2,
+        "gateway_overhead": 1.2,
+        "total": 1631.4
+      },
+      "usage": {
+        "prompt_tokens": 2210,
+        "completion_tokens": 640,
+        "cost_usd": 0.00954,
+        "gpu_seconds": 0.0,
+        "budget_left_usd": 0.05
+      },
+      "policy": {
+        "version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+        "profile": "balanced",
+        "mode": "enforce"
+      },
+      "tool": null,
+      "message": null,
+      "approval_id": null,
+      "excerpt": "UnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbr"
+    },
+    {
+      "ts": "2026-10-04T05:23:46.906Z",
+      "seq": 121,
+      "trace_id": "tr_01K6MSMBXK3DNT8H6XMQYQPGZ7",
+      "prev_hash": "89daeb0e16e61934247052a21b185129b35fbb316eb24de567e5b2545bb11ff4",
+      "hash": "a8f60ae0ad36b3a1c69096cdb53903472fb1c3ee7c92e1958ff65104b61f88ea",
+      "type": "decision",
+      "principal": {
+        "id": "ops-copilot-with-a-very-long-service-account-name-for-testing",
+        "team": "operations-and-customer-servicing-emea-region"
+      },
+      "session_id": "ses_66e61cb50264",
+      "route": "openai.chat",
+      "direction": "input",
+      "model": "hf.co/some-organization/very-long-model-name-instruct-2026-q4-gguf:Q4_K_M",
+      "upstream": "ollama",
+      "action": "allow",
+      "enforced": true,
+      "status_code": 200,
+      "findings": [],
+      "judge": {
+        "invoked": false,
+        "reason": null,
+        "backend": null,
+        "answers": {},
+        "latency_ms": 0,
+        "cached": false
+      },
+      "latency_ms": {
+        "t0": 1.01,
+        "t1": 22.3,
+        "t2": 0.0,
+        "upstream": 494.2,
+        "gateway_overhead": 25.0,
+        "total": 519.2
+      },
+      "usage": {
+        "prompt_tokens": 1878,
+        "completion_tokens": 404,
+        "cost_usd": 0.000539,
+        "gpu_seconds": 0.49,
+        "budget_left_usd": null
+      },
+      "policy": {
+        "version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+        "profile": "balanced",
+        "mode": "enforce"
+      },
+      "tool": null,
+      "message": null,
+      "approval_id": null,
+      "excerpt": "UnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbr"
+    },
+    {
+      "ts": "2026-10-04T05:21:21.955Z",
+      "seq": 120,
+      "trace_id": "tr_01K6P3JA0A0A7JSQ1NH3GA0KGK",
+      "prev_hash": "1af567baf505112393660c9bf0c729cfc95256182f5a72e7b3499f67d7419cc5",
+      "hash": "89daeb0e16e61934247052a21b185129b35fbb316eb24de567e5b2545bb11ff4",
+      "type": "decision",
+      "principal": {
+        "id": "dev-assistant-with-a-very-long-service-account-name-for-testing",
+        "team": "operations-and-customer-servicing-emea-region"
+      },
+      "session_id": "ses_bfa553312cce",
+      "route": "openai.chat",
+      "direction": "input",
+      "model": "hf.co/some-organization/very-long-model-name-instruct-2026-q4-gguf:Q4_K_M",
+      "upstream": "ollama",
+      "action": "log",
+      "enforced": true,
+      "status_code": 200,
+      "findings": [
+        {
+          "control": "pii",
+          "rule": "NIP-extremely-long-rule-identifier-from-a-custom-plugin-v2",
+          "tier": "T0",
+          "severity": "low",
+          "score": 1.0,
+          "action": "log",
+          "span": [
+            40,
+            53
+          ],
+          "evidence": "NIP ***-***-**-61ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+          "reason": "Polish tax ID with valid checksum; policy action for NIP is log. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. ",
+          "owasp_llm": [
+            "LLM02"
+          ],
+          "owasp_agentic": [],
+          "atlas": [
+            "AML.T0057"
+          ],
+          "signature_id": null
+        }
+      ],
+      "judge": {
+        "invoked": false,
+        "reason": null,
+        "backend": null,
+        "answers": {},
+        "latency_ms": 0,
+        "cached": false
+      },
+      "latency_ms": {
+        "t0": 0.5,
+        "t1": 23.4,
+        "t2": 0.0,
+        "upstream": 911.8,
+        "gateway_overhead": 25.7,
+        "total": 937.5
+      },
+      "usage": {
+        "prompt_tokens": 184,
+        "completion_tokens": 108,
+        "cost_usd": 0.001001,
+        "gpu_seconds": 0.91,
+        "budget_left_usd": null
+      },
+      "policy": {
+        "version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+        "profile": "balanced",
+        "mode": "enforce"
+      },
+      "tool": null,
+      "message": null,
+      "approval_id": null,
+      "excerpt": "UnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbr"
+    },
+    {
+      "ts": "2026-10-04T05:18:40.002Z",
+      "seq": 119,
+      "trace_id": "tr_01K6SQF00YPEJ4N6G8HRDYZ3JV",
+      "prev_hash": "833b12bf6bc2a2ab2cb9e107a653aaa842a1c4ef42be2d8d8ef0129c446a9fa5",
+      "hash": "1af567baf505112393660c9bf0c729cfc95256182f5a72e7b3499f67d7419cc5",
+      "type": "decision",
+      "principal": {
+        "id": "ops-copilot-with-a-very-long-service-account-name-for-testing",
+        "team": "operations-and-customer-servicing-emea-region"
+      },
+      "session_id": "ses_fc4f032749da",
+      "route": "guard.check",
+      "direction": "tool_call",
+      "model": null,
+      "upstream": null,
+      "action": "require_approval",
+      "enforced": true,
+      "status_code": 200,
+      "findings": [
+        {
+          "control": "tool_governance",
+          "rule": "max-amount-extremely-long-rule-identifier-from-a-custom-plugin-v2",
+          "tier": "T0",
+          "severity": "high",
+          "score": 1.0,
+          "action": "require_approval",
+          "span": null,
+          "evidence": "amount: 4800.00 EURZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+          "reason": "payments.create_transfer amount 4800.00 exceeds max_amount 1000; above_max=require_approval. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. Additional explanation text. ",
+          "owasp_llm": [
+            "LLM06"
+          ],
+          "owasp_agentic": [
+            "ASI02"
+          ],
+          "atlas": [
+            "AML.T0053"
+          ],
+          "signature_id": null
+        }
+      ],
+      "judge": {
+        "invoked": false,
+        "reason": null,
+        "backend": null,
+        "answers": {},
+        "latency_ms": 0,
+        "cached": false
+      },
+      "latency_ms": {
+        "t0": 0.86,
+        "t1": 0.0,
+        "t2": 0.0,
+        "upstream": 0.0,
+        "gateway_overhead": 2.3,
+        "total": 2.3
+      },
+      "usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cost_usd": 0.0,
+        "gpu_seconds": 0.0,
+        "budget_left_usd": null
+      },
+      "policy": {
+        "version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+        "profile": "balanced",
+        "mode": "enforce"
+      },
+      "tool": {
+        "name": "enterprise.crm.customers.lookup_customer_by_identifier_and_region",
+        "arguments": {
+          "from_account": "PL61 **** 0000",
+          "to_iban": "DE89 **** 3000",
+          "amount": 4800.0,
+          "currency": "EUR",
+          "reference": "Invoice 2026/09/114"
+        }
+      },
+      "message": "payments.create_transfer for 4800.00 EUR exceeds the 1000 limit and needs approval apr_91ab. Ask a security approver to review it in the dashboard. Next step: contact the security team on the internal channel. Next step: contact the security team on the internal channel. Next step: contact the security team on the internal channel. Next step: contact the security team on the internal channel. ",
+      "approval_id": "apr_91ab",
+      "excerpt": "UnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbrokenUnbr"
+    }
+  ]
+}

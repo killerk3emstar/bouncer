@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-04",
+  "currency": "USD",
+  "resets_at": "2026-10-05T00:00:00.000Z",
+  "on_exceed": {
+    "action": "downgrade",
+    "downgrade_to": "qwen3:8b",
+    "hard_limit_action": "block"
+  },
+  "teams": [
+    {
+      "team": "operations",
+      "usd_per_day": 5.0,
+      "spent_usd": 0.0,
+      "requests": 0,
+      "tokens_per_minute": 30000,
+      "tokens_last_minute": 0,
+      "gpu_seconds_per_hour": 900,
+      "gpu_seconds_last_hour": 0.0,
+      "state": "ok"
+    },
+    {
+      "team": "engineering",
+      "usd_per_day": 2.0,
+      "spent_usd": 0.0,
+      "requests": 0,
+      "tokens_per_minute": 60000,
+      "tokens_last_minute": 0,
+      "gpu_seconds_per_hour": 600,
+      "gpu_seconds_last_hour": 0.0,
+      "state": "ok"
+    },
+    {
+      "team": "interns",
+      "usd_per_day": 0.05,
+      "spent_usd": 0.0,
+      "requests": 0,
+      "tokens_per_minute": 5000,
+      "tokens_last_minute": 0,
+      "gpu_seconds_per_hour": 60,
+      "gpu_seconds_last_hour": 0.0,
+      "state": "ok"
+    },
+    {
+      "team": "security",
+      "usd_per_day": 1.0,
+      "spent_usd": 0.0,
+      "requests": 0,
+      "tokens_per_minute": 20000,
+      "tokens_last_minute": 0,
+      "gpu_seconds_per_hour": 300,
+      "gpu_seconds_last_hour": 0.0,
+      "state": "ok"
+    }
+  ],
+  "principals": [
+    {
+      "principal": "ops-copilot",
+      "team": "operations",
+      "spent_usd": 0.0,
+      "requests": 0
+    },
+    {
+      "principal": "dev-assistant",
+      "team": "engineering",
+      "spent_usd": 0.0,
+      "requests": 0
+    },
+    {
+      "principal": "intern-bot",
+      "team": "interns",
+      "spent_usd": 0.0,
+      "requests": 0
+    },
+    {
+      "principal": "playground",
+      "team": "security",
+      "spent_usd": 0.0,
+      "requests": 0
+    }
+  ]
+}

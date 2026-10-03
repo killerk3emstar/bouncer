@@ -1,0 +1,441 @@
+{
+  "frameworks": [
+    {
+      "id": "owasp_llm_2025",
+      "name": "OWASP Top 10 for LLM Applications 2025",
+      "url": "https://genai.owasp.org/llm-top-10/"
+    },
+    {
+      "id": "owasp_agentic_2026",
+      "name": "OWASP Top 10 for Agentic Applications 2026",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
+    }
+  ],
+  "controls": [
+    "auth",
+    "budgets",
+    "loops",
+    "secrets",
+    "pii",
+    "obfuscation",
+    "prompt_injection",
+    "tool_governance",
+    "output_safety",
+    "signatures",
+    "supply_chain",
+    "mcp_pinning",
+    "approvals",
+    "harmful_content"
+  ],
+  "risks": [
+    {
+      "id": "LLM01",
+      "framework": "owasp_llm_2025",
+      "name": "Prompt Injection",
+      "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+      "status": "covered",
+      "tests": 47,
+      "note": null,
+      "cells": {
+        "prompt_injection": {
+          "status": "covered",
+          "tests": 26
+        },
+        "obfuscation": {
+          "status": "covered",
+          "tests": 14
+        },
+        "signatures": {
+          "status": "covered",
+          "tests": 7
+        }
+      }
+    },
+    {
+      "id": "LLM02",
+      "framework": "owasp_llm_2025",
+      "name": "Sensitive Information Disclosure",
+      "url": "https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/",
+      "status": "covered",
+      "tests": 52,
+      "note": null,
+      "cells": {
+        "secrets": {
+          "status": "covered",
+          "tests": 20
+        },
+        "pii": {
+          "status": "covered",
+          "tests": 22
+        },
+        "output_safety": {
+          "status": "covered",
+          "tests": 6
+        },
+        "tool_governance": {
+          "status": "covered",
+          "tests": 4
+        }
+      }
+    },
+    {
+      "id": "LLM03",
+      "framework": "owasp_llm_2025",
+      "name": "Supply Chain",
+      "url": "https://genai.owasp.org/llmrisk/llm032025-supply-chain/",
+      "status": "covered",
+      "tests": 21,
+      "note": null,
+      "cells": {
+        "signatures": {
+          "status": "covered",
+          "tests": 8
+        },
+        "supply_chain": {
+          "status": "covered",
+          "tests": 7
+        },
+        "mcp_pinning": {
+          "status": "covered",
+          "tests": 6
+        }
+      }
+    },
+    {
+      "id": "LLM04",
+      "framework": "owasp_llm_2025",
+      "name": "Data and Model Poisoning",
+      "url": "https://genai.owasp.org/llmrisk/llm042025-data-and-model-poisoning/",
+      "status": "partial",
+      "tests": 3,
+      "note": "Only model source allowlist and safetensors; no training-data or fine-tune poisoning checks.",
+      "cells": {
+        "supply_chain": {
+          "status": "partial",
+          "tests": 3
+        }
+      }
+    },
+    {
+      "id": "LLM05",
+      "framework": "owasp_llm_2025",
+      "name": "Improper Output Handling",
+      "url": "https://genai.owasp.org/llmrisk/llm052025-improper-output-handling/",
+      "status": "covered",
+      "tests": 14,
+      "note": "harmful_content (judge question 'harm') is disabled in the policy.",
+      "cells": {
+        "output_safety": {
+          "status": "covered",
+          "tests": 11
+        },
+        "signatures": {
+          "status": "covered",
+          "tests": 3
+        },
+        "harmful_content": {
+          "status": "none",
+          "tests": 0
+        }
+      }
+    },
+    {
+      "id": "LLM06",
+      "framework": "owasp_llm_2025",
+      "name": "Excessive Agency",
+      "url": "https://genai.owasp.org/llmrisk/llm062025-excessive-agency/",
+      "status": "covered",
+      "tests": 34,
+      "note": null,
+      "cells": {
+        "tool_governance": {
+          "status": "covered",
+          "tests": 18
+        },
+        "auth": {
+          "status": "covered",
+          "tests": 10
+        },
+        "approvals": {
+          "status": "covered",
+          "tests": 6
+        }
+      }
+    },
+    {
+      "id": "LLM07",
+      "framework": "owasp_llm_2025",
+      "name": "System Prompt Leakage",
+      "url": "https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/",
+      "status": "covered",
+      "tests": 4,
+      "note": "Canary token in system prompts; detects verbatim leaks only.",
+      "cells": {
+        "output_safety": {
+          "status": "covered",
+          "tests": 4
+        }
+      }
+    },
+    {
+      "id": "LLM08",
+      "framework": "owasp_llm_2025",
+      "name": "Vector and Embedding Weaknesses",
+      "url": "https://genai.owasp.org/llmrisk/llm082025-vector-and-embedding-weaknesses/",
+      "status": "partial",
+      "tests": 4,
+      "note": "Retrieved chunks are scanned as untrusted content; no vector store access control.",
+      "cells": {
+        "prompt_injection": {
+          "status": "partial",
+          "tests": 4
+        }
+      }
+    },
+    {
+      "id": "LLM09",
+      "framework": "owasp_llm_2025",
+      "name": "Misinformation",
+      "url": "https://genai.owasp.org/llmrisk/llm092025-misinformation/",
+      "status": "none",
+      "tests": 0,
+      "note": "Out of scope: no factuality or hallucination checks.",
+      "cells": {}
+    },
+    {
+      "id": "LLM10",
+      "framework": "owasp_llm_2025",
+      "name": "Unbounded Consumption",
+      "url": "https://genai.owasp.org/llmrisk/llm102025-unbounded-consumption/",
+      "status": "covered",
+      "tests": 18,
+      "note": null,
+      "cells": {
+        "budgets": {
+          "status": "covered",
+          "tests": 10
+        },
+        "loops": {
+          "status": "covered",
+          "tests": 8
+        }
+      }
+    },
+    {
+      "id": "ASI01",
+      "framework": "owasp_agentic_2026",
+      "name": "Agent Goal Hijack",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "covered",
+      "tests": 38,
+      "note": null,
+      "cells": {
+        "prompt_injection": {
+          "status": "covered",
+          "tests": 22
+        },
+        "obfuscation": {
+          "status": "covered",
+          "tests": 9
+        },
+        "tool_governance": {
+          "status": "covered",
+          "tests": 7
+        }
+      }
+    },
+    {
+      "id": "ASI02",
+      "framework": "owasp_agentic_2026",
+      "name": "Tool Misuse and Exploitation",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "covered",
+      "tests": 24,
+      "note": null,
+      "cells": {
+        "tool_governance": {
+          "status": "covered",
+          "tests": 18
+        },
+        "approvals": {
+          "status": "covered",
+          "tests": 6
+        }
+      }
+    },
+    {
+      "id": "ASI03",
+      "framework": "owasp_agentic_2026",
+      "name": "Identity and Privilege Abuse",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "partial",
+      "tests": 14,
+      "note": "Per-agent permissions only; signed agent-to-agent delegation is not implemented.",
+      "cells": {
+        "auth": {
+          "status": "covered",
+          "tests": 10
+        },
+        "secrets": {
+          "status": "partial",
+          "tests": 4
+        }
+      }
+    },
+    {
+      "id": "ASI04",
+      "framework": "owasp_agentic_2026",
+      "name": "Agentic Supply Chain Vulnerabilities",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "covered",
+      "tests": 17,
+      "note": null,
+      "cells": {
+        "supply_chain": {
+          "status": "covered",
+          "tests": 7
+        },
+        "mcp_pinning": {
+          "status": "covered",
+          "tests": 6
+        },
+        "signatures": {
+          "status": "covered",
+          "tests": 4
+        }
+      }
+    },
+    {
+      "id": "ASI05",
+      "framework": "owasp_agentic_2026",
+      "name": "Unexpected Code Execution",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "covered",
+      "tests": 13,
+      "note": null,
+      "cells": {
+        "signatures": {
+          "status": "covered",
+          "tests": 10
+        },
+        "tool_governance": {
+          "status": "covered",
+          "tests": 3
+        }
+      }
+    },
+    {
+      "id": "ASI06",
+      "framework": "owasp_agentic_2026",
+      "name": "Memory and Context Poisoning",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "partial",
+      "tests": 5,
+      "note": "Tool results are scanned; writes to memory or knowledge base are not scanned yet.",
+      "cells": {
+        "prompt_injection": {
+          "status": "partial",
+          "tests": 5
+        }
+      }
+    },
+    {
+      "id": "ASI07",
+      "framework": "owasp_agentic_2026",
+      "name": "Insecure Inter-Agent Communication",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "none",
+      "tests": 0,
+      "note": "Not covered: no signed inter-agent identity (planned).",
+      "cells": {}
+    },
+    {
+      "id": "ASI08",
+      "framework": "owasp_agentic_2026",
+      "name": "Cascading Failures",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "partial",
+      "tests": 12,
+      "note": "Loop circuit breaker and budgets per session; no cross-agent failure propagation tracking.",
+      "cells": {
+        "budgets": {
+          "status": "partial",
+          "tests": 4
+        },
+        "loops": {
+          "status": "covered",
+          "tests": 8
+        }
+      }
+    },
+    {
+      "id": "ASI09",
+      "framework": "owasp_agentic_2026",
+      "name": "Human-Agent Trust Exploitation",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "partial",
+      "tests": 3,
+      "note": "Approvals show masked arguments and the reason; no detection of agents misleading users.",
+      "cells": {
+        "approvals": {
+          "status": "partial",
+          "tests": 3
+        }
+      }
+    },
+    {
+      "id": "ASI10",
+      "framework": "owasp_agentic_2026",
+      "name": "Rogue Agents",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "status": "partial",
+      "tests": 8,
+      "note": "Goal-alignment check on side-effect tools only.",
+      "cells": {
+        "tool_governance": {
+          "status": "partial",
+          "tests": 5
+        },
+        "loops": {
+          "status": "partial",
+          "tests": 3
+        }
+      }
+    }
+  ],
+  "posture": {
+    "score": 72,
+    "formula": "100 * (covered + 0.5 * partial) / total risks",
+    "total": 20,
+    "covered": 11,
+    "partial": 7,
+    "not_covered": 2,
+    "by_framework": {
+      "owasp_llm_2025": {
+        "total": 10,
+        "covered": 7,
+        "partial": 2,
+        "not_covered": 1
+      },
+      "owasp_agentic_2026": {
+        "total": 10,
+        "covered": 4,
+        "partial": 5,
+        "not_covered": 1
+      }
+    },
+    "controls": {
+      "total": 14,
+      "enabled": 13,
+      "enforce": 13,
+      "monitor": 0,
+      "disabled": 1
+    },
+    "tests": {
+      "total": 180,
+      "passed": 179,
+      "failed": 1,
+      "last_run": "2026-10-04T05:16:00.000Z"
+    }
+  }
+}

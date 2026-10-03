@@ -1,0 +1,472 @@
+{
+  "feed": "bouncer-community",
+  "version": 7,
+  "updated": "2026-10-04T01:00:00.000Z",
+  "source": "signatures/feed.json",
+  "verified": true,
+  "public_key_fingerprint": "ed25519:f5467a4f7f8141d8c2be384606b36755",
+  "loaded_at": "2026-10-04T01:00:31.208Z",
+  "last_check": "2026-10-04T05:29:48.000Z",
+  "last_error": null,
+  "last_error_at": null,
+  "signatures": [
+    {
+      "id": "SIG-0001",
+      "title": "Unicode tag characters (ASCII smuggling)",
+      "targets": [
+        "input",
+        "tool_result",
+        "tool_definition"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://embracethered.com/blog/posts/2024/hiding-and-finding-text-with-unicode-tags/"
+      ],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 3,
+      "hits_total": 4,
+      "last_hit": "2026-10-04T03:27:18.330Z"
+    },
+    {
+      "id": "SIG-0002",
+      "title": "Markdown image or link with data to a non-allowlisted domain (EchoLeak class)",
+      "targets": [
+        "output"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "redact",
+      "cve": [
+        "CVE-2025-32711"
+      ],
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2025-32711"
+      ],
+      "owasp_llm": [
+        "LLM05",
+        "LLM02"
+      ],
+      "owasp_agentic": [],
+      "added": "2026-10-04",
+      "hits_24h": 2,
+      "hits_total": 3,
+      "last_hit": "2026-10-04T04:30:12.600Z"
+    },
+    {
+      "id": "SIG-0003",
+      "title": "Chat-template control tokens in user content or tool results",
+      "targets": [
+        "input",
+        "tool_result"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://genai.owasp.org/llmrisk/llm01-prompt-injection/"
+      ],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 4,
+      "hits_total": 5,
+      "last_hit": "2026-10-04T04:47:31.000Z"
+    },
+    {
+      "id": "SIG-0004",
+      "title": "Python pickle code-execution opcodes (also base64-encoded)",
+      "targets": [
+        "input",
+        "tool_call",
+        "tool_result"
+      ],
+      "match_type": "regex",
+      "severity": "critical",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://www.reversinglabs.com/blog/rl-identifies-malware-ml-model-hosted-on-hugging-face"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 1,
+      "hits_total": 2,
+      "last_hit": "2026-10-04T01:52:03.017Z"
+    },
+    {
+      "id": "SIG-0005",
+      "title": "torch.load without weights_only=True",
+      "targets": [
+        "input",
+        "tool_call"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [
+        "CVE-2025-32434"
+      ],
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2025-32434"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0006",
+      "title": "Keras Lambda layer or safe_mode=False",
+      "targets": [
+        "tool_call"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [
+        "CVE-2024-3660"
+      ],
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2024-3660"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0007",
+      "title": "trust_remote_code=True",
+      "targets": [
+        "input",
+        "tool_call"
+      ],
+      "match_type": "substring",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://huggingface.co/docs/transformers/en/custom_models"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 1,
+      "hits_total": 2,
+      "last_hit": "2026-10-04T00:48:02.000Z"
+    },
+    {
+      "id": "SIG-0008",
+      "title": "yaml.load without SafeLoader, yaml.unsafe_load",
+      "targets": [
+        "tool_call"
+      ],
+      "match_type": "regex",
+      "severity": "medium",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation"
+      ],
+      "owasp_llm": [
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0009",
+      "title": "LangChain LLMMathChain __import__ in expressions",
+      "targets": [
+        "tool_call",
+        "output"
+      ],
+      "match_type": "regex",
+      "severity": "critical",
+      "action": "block",
+      "cve": [
+        "CVE-2023-29374"
+      ],
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2023-29374"
+      ],
+      "owasp_llm": [
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0010",
+      "title": "Unauthenticated Ray Jobs API call (ShadowRay)",
+      "targets": [
+        "tool_call"
+      ],
+      "match_type": "regex",
+      "severity": "critical",
+      "action": "block",
+      "cve": [
+        "CVE-2023-48022"
+      ],
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2023-48022",
+        "https://www.oligo.security/blog/shadowray-attack-ai-workloads-actively-exploited-in-the-wild"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0011",
+      "title": "Ollama /api/pull with path traversal in digest (Probllama)",
+      "targets": [
+        "tool_call"
+      ],
+      "match_type": "regex",
+      "severity": "critical",
+      "action": "block",
+      "cve": [
+        "CVE-2024-37032"
+      ],
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2024-37032",
+        "https://www.wiz.io/blog/probllama-ollama-vulnerability-cve-2024-37032"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0012",
+      "title": "SSRF to cloud metadata endpoints",
+      "targets": [
+        "tool_call",
+        "output"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://attack.mitre.org/techniques/T1552/005/"
+      ],
+      "owasp_llm": [
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI02"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0013",
+      "title": "Reverse shell and pipe-to-shell downloads",
+      "targets": [
+        "tool_call",
+        "output"
+      ],
+      "match_type": "regex",
+      "severity": "critical",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://attack.mitre.org/techniques/T1059/004/"
+      ],
+      "owasp_llm": [
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0014",
+      "title": "Tool poisoning instructions in a tool description",
+      "targets": [
+        "tool_definition"
+      ],
+      "match_type": "regex",
+      "severity": "critical",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks"
+      ],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI04"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 1,
+      "hits_total": 2,
+      "last_hit": "2026-10-04T04:40:00.330Z"
+    },
+    {
+      "id": "SIG-0015",
+      "title": "Hidden BCC/CC to an external domain in mail tools (postmark-mcp)",
+      "targets": [
+        "tool_call",
+        "tool_definition"
+      ],
+      "match_type": "structural",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://www.koi.ai/blog/postmark-mcp-npm-malicious-backdoor-email-theft"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI02",
+        "ASI04"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    },
+    {
+      "id": "SIG-0016",
+      "title": "Policy Puppetry: fake policy or config blocks in the prompt",
+      "targets": [
+        "input",
+        "tool_result"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"
+      ],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 2,
+      "hits_total": 3,
+      "last_hit": "2026-10-04T03:58:11.000Z"
+    },
+    {
+      "id": "SIG-0017",
+      "title": "DAN, developer mode and Skeleton Key phrasing",
+      "targets": [
+        "input"
+      ],
+      "match_type": "regex",
+      "severity": "high",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://www.microsoft.com/en-us/security/blog/2024/06/26/mitigating-skeleton-key-a-new-type-of-generative-ai-jailbreak-technique/"
+      ],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 3,
+      "hits_total": 4,
+      "last_hit": "2026-10-04T04:12:09.000Z"
+    },
+    {
+      "id": "SIG-0018",
+      "title": "Many-shot jailbreaking: many fake dialogue turns in one message",
+      "targets": [
+        "input"
+      ],
+      "match_type": "structural",
+      "severity": "medium",
+      "action": "block",
+      "cve": [],
+      "refs": [
+        "https://www.anthropic.com/research/many-shot-jailbreaking"
+      ],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "added": "2026-10-04",
+      "hits_24h": 0,
+      "hits_total": 0,
+      "last_hit": null
+    }
+  ]
+}

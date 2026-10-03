@@ -137,3 +137,16 @@ def test_watcher_reloads_within_two_seconds(policy_file: Path) -> None:
 
     elapsed = asyncio.run(run())
     assert elapsed < 2.0
+
+
+def test_rejected_reload_has_dashboard_fields(policy_file: Path) -> None:
+    mgr = PolicyManager(policy_file)
+    mgr.load_initial()
+    policy_file.write_text(policy_file.read_text().replace("approval_above: 0.35", "approval_above: 8.5", 1))
+    assert mgr.reload() is False
+    err = mgr.last_error
+    assert err["path"] == "controls.prompt_injection.judge.approval_above"
+    assert err["value"] == "8.5" and err["column"] is not None
+    assert any("8.5" in s["text"] for s in err["snippet"])
+    assert err["attempted_version"].startswith("sha256:")
+    assert mgr.rejected and "8.5" in mgr.rejected[0]["diff"]

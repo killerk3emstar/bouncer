@@ -1,0 +1,190 @@
+{
+  "window": "1h",
+  "from": "2026-10-04T04:30:00.000Z",
+  "to": "2026-10-04T05:30:00.000Z",
+  "generated_at": "2026-10-04T05:30:00.000Z",
+  "totals": {
+    "requests": 170,
+    "allow": 164,
+    "log": 1,
+    "redact": 1,
+    "require_approval": 4,
+    "block": 0
+  },
+  "usage": {
+    "prompt_tokens": 138040,
+    "completion_tokens": 36380,
+    "cost_usd": 0.31,
+    "gpu_seconds": 120.7
+  },
+  "series": {
+    "bucket_seconds": 300,
+    "buckets": [
+      {
+        "ts": "2026-10-04T04:30:00.000Z",
+        "block": 0,
+        "require_approval": 1,
+        "redact": 0,
+        "log": 0,
+        "allow": 14
+      },
+      {
+        "ts": "2026-10-04T04:35:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 11
+      },
+      {
+        "ts": "2026-10-04T04:40:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 14
+      },
+      {
+        "ts": "2026-10-04T04:45:00.000Z",
+        "block": 0,
+        "require_approval": 1,
+        "redact": 0,
+        "log": 0,
+        "allow": 11
+      },
+      {
+        "ts": "2026-10-04T04:50:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 1,
+        "log": 1,
+        "allow": 17
+      },
+      {
+        "ts": "2026-10-04T04:55:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 16
+      },
+      {
+        "ts": "2026-10-04T05:00:00.000Z",
+        "block": 0,
+        "require_approval": 1,
+        "redact": 0,
+        "log": 0,
+        "allow": 12
+      },
+      {
+        "ts": "2026-10-04T05:05:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 17
+      },
+      {
+        "ts": "2026-10-04T05:10:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 13
+      },
+      {
+        "ts": "2026-10-04T05:15:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 15
+      },
+      {
+        "ts": "2026-10-04T05:20:00.000Z",
+        "block": 0,
+        "require_approval": 0,
+        "redact": 0,
+        "log": 0,
+        "allow": 11
+      },
+      {
+        "ts": "2026-10-04T05:25:00.000Z",
+        "block": 0,
+        "require_approval": 1,
+        "redact": 0,
+        "log": 0,
+        "allow": 13
+      }
+    ]
+  },
+  "top_controls": [
+    {
+      "control": "tool_governance",
+      "log": 0,
+      "redact": 0,
+      "require_approval": 4,
+      "block": 0,
+      "count": 4
+    },
+    {
+      "control": "pii",
+      "log": 1,
+      "redact": 1,
+      "require_approval": 0,
+      "block": 0,
+      "count": 2
+    }
+  ],
+  "top_owasp": [
+    {
+      "id": "LLM06",
+      "name": "Excessive Agency",
+      "count": 4
+    },
+    {
+      "id": "ASI02",
+      "name": "Tool Misuse and Exploitation",
+      "count": 4
+    },
+    {
+      "id": "LLM02",
+      "name": "Sensitive Information Disclosure",
+      "count": 2
+    }
+  ],
+  "latency_ms": {
+    "t0": {
+      "n": 170,
+      "p50": 0.62,
+      "p95": 1.48
+    },
+    "t1": {
+      "n": 120,
+      "p50": 13.1,
+      "p95": 24.7
+    },
+    "t2": {
+      "n": 2,
+      "p50": 1390.0,
+      "p95": 2710.0
+    },
+    "gateway_overhead": {
+      "n": 170,
+      "p50": 15.2,
+      "p95": 41.8
+    },
+    "upstream": {
+      "n": 170,
+      "p50": 842.0,
+      "p95": 2410.0
+    }
+  },
+  "t2": {
+    "escalations": 2,
+    "escalation_rate": 0.0118,
+    "cache_hits": 0,
+    "cache_hit_rate": 0.29,
+    "timeouts": 0
+  }
+}

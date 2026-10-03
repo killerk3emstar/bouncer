@@ -1,0 +1,13 @@
+{
+  "feed": "bouncer-community",
+  "version": 7,
+  "updated": "2026-10-04T01:00:00.000Z",
+  "source": "signatures/feed.json",
+  "verified": true,
+  "public_key_fingerprint": "ed25519:f5467a4f7f8141d8c2be384606b36755",
+  "loaded_at": "2026-10-04T01:00:31.208Z",
+  "last_check": "2026-10-04T05:29:48.000Z",
+  "last_error": null,
+  "last_error_at": null,
+  "signatures": []
+}

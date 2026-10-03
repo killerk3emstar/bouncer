@@ -1,0 +1,606 @@
+{
+  "policy_version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+  "controls": [
+    {
+      "id": "auth",
+      "title": "Agent authentication and permissions",
+      "description": "API key to principal; allowed models and tools per principal.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "input"
+      ],
+      "settings": {
+        "principals": 4,
+        "unknown_key": "401",
+        "model_not_allowed": "403",
+        "unknown_tool": "block"
+      },
+      "owasp_llm": [
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI03"
+      ],
+      "atlas": [],
+      "tests": {
+        "allow": 4,
+        "block": 6,
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 0,
+        "last_triggered": "2026-10-04T03:16:41.077Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "budgets",
+      "title": "Budgets and rate limits",
+      "description": "USD per team per day, tokens per minute, GPU seconds per hour, per-session caps; downgrade to a local model.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "downgrade",
+      "directions": [
+        "input"
+      ],
+      "settings": {
+        "teams.operations.usd_per_day": 5.0,
+        "teams.engineering.usd_per_day": 2.0,
+        "teams.interns.usd_per_day": 0.05,
+        "teams.security.usd_per_day": 1.0,
+        "sessions.max_usd": 0.5,
+        "requests.max_input_tokens": 16000,
+        "on_exceed.action": "downgrade",
+        "on_exceed.downgrade_to": "qwen3:8b",
+        "on_exceed.hard_limit_action": "block"
+      },
+      "owasp_llm": [
+        "LLM10"
+      ],
+      "owasp_agentic": [
+        "ASI08"
+      ],
+      "atlas": [],
+      "tests": {
+        "allow": 4,
+        "block": 6,
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 17,
+        "last_triggered": "2026-10-04T04:22:09.031Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "loops",
+      "title": "Loops and runaway agents",
+      "description": "Identical tool calls, step limits and a circuit breaker with cooldown.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "tool_call"
+      ],
+      "settings": {
+        "sessions.max_steps": 25,
+        "sessions.max_identical_tool_calls": 3,
+        "sessions.loop_window_seconds": 120,
+        "sessions.loop_cooldown_seconds": 60
+      },
+      "owasp_llm": [
+        "LLM10"
+      ],
+      "owasp_agentic": [
+        "ASI08"
+      ],
+      "atlas": [],
+      "tests": {
+        "allow": 3,
+        "block": 5,
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 0,
+        "last_triggered": "2026-10-04T03:40:20.197Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "secrets",
+      "title": "Secrets",
+      "description": "Provider keys, tokens, private keys, JWTs, connection strings, high-entropy strings.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "redact",
+      "directions": [
+        "input",
+        "output",
+        "tool_call",
+        "tool_result"
+      ],
+      "settings": {
+        "rules": "builtin",
+        "entropy.enabled": true,
+        "entropy.min_length": 24,
+        "entropy.min_bits_per_char": 4.2,
+        "overrides.private-key": "block"
+      },
+      "owasp_llm": [
+        "LLM02"
+      ],
+      "owasp_agentic": [
+        "ASI03"
+      ],
+      "atlas": [
+        "AML.T0057"
+      ],
+      "tests": {
+        "allow": 8,
+        "block": 12,
+        "total": 20,
+        "passed": 20,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 31,
+        "last_triggered": "2026-10-04T05:24:18.650Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "pii",
+      "title": "Personal data",
+      "description": "E-mail, phone, PESEL, NIP, IBAN, payment cards; checksum-validated where possible.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "redact",
+      "directions": [
+        "input",
+        "output",
+        "tool_result"
+      ],
+      "settings": {
+        "entities.EMAIL": "redact",
+        "entities.PHONE": "redact",
+        "entities.PESEL": "redact",
+        "entities.NIP": "log",
+        "entities.IBAN": "redact",
+        "entities.CREDIT_CARD": "block",
+        "output_visible_for_clearance": "confidential, restricted"
+      },
+      "owasp_llm": [
+        "LLM02"
+      ],
+      "owasp_agentic": [],
+      "atlas": [
+        "AML.T0057"
+      ],
+      "tests": {
+        "allow": 9,
+        "block": 13,
+        "total": 22,
+        "passed": 22,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 85,
+        "last_triggered": "2026-10-04T05:21:21.955Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "obfuscation",
+      "title": "Normalization and obfuscation",
+      "description": "NFKC, invisible characters, Unicode tag smuggling, decoded copies (base64, hex, url) rescanned.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "input",
+        "tool_result"
+      ],
+      "settings": {
+        "strip_invisible": true,
+        "unicode_tag_chars": "block",
+        "decode": "base64, hex, url",
+        "max_decode_depth": 2
+      },
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "atlas": [
+        "AML.T0051"
+      ],
+      "tests": {
+        "allow": 5,
+        "block": 9,
+        "total": 14,
+        "passed": 13,
+        "failed": 1,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 12,
+        "last_triggered": "2026-10-04T04:03:51.012Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "prompt_injection",
+      "title": "Prompt injection",
+      "description": "T0 phrase and chat-token heuristics (EN, PL), T1 classifier, T2 judge for the grey zone and non-English text.",
+      "tiers": [
+        "T0",
+        "T1",
+        "T2"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "input",
+        "tool_result",
+        "tool_definition"
+      ],
+      "settings": {
+        "apply_to": "user, tool_result, tool_definition",
+        "heuristics.action": "block",
+        "classifier.block_above": 0.95,
+        "classifier.escalate_above": 0.5,
+        "judge.block_above": 0.8,
+        "judge.approval_above": 0.6,
+        "escalate_non_english": true
+      },
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01",
+        "ASI06"
+      ],
+      "atlas": [
+        "AML.T0051"
+      ],
+      "tests": {
+        "allow": 10,
+        "block": 16,
+        "total": 26,
+        "passed": 26,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 41,
+        "last_triggered": "2026-10-04T04:47:31.044Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "tool_governance",
+      "title": "Tool governance",
+      "description": "Tool allowlists, argument constraints, side-effect tools, lethal trifecta, T2 goal alignment.",
+      "tiers": [
+        "T0",
+        "T2"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "require_approval",
+      "directions": [
+        "tool_call"
+      ],
+      "settings": {
+        "side_effect_tools": "mail.send, payments.create_transfer, code.run_python",
+        "unknown_tool": "block",
+        "lethal_trifecta.action": "require_approval",
+        "goal_alignment.block_above": 0.8,
+        "arguments.mail.send.to_domains_allow": "bank.example",
+        "arguments.mail.send.forbid_fields": "bcc",
+        "arguments.payments.create_transfer.max_amount": 1000,
+        "arguments.payments.create_transfer.above_max": "require_approval"
+      },
+      "owasp_llm": [
+        "LLM06",
+        "LLM02"
+      ],
+      "owasp_agentic": [
+        "ASI01",
+        "ASI02",
+        "ASI10"
+      ],
+      "atlas": [
+        "AML.T0053"
+      ],
+      "tests": {
+        "allow": 6,
+        "block": 12,
+        "total": 18,
+        "passed": 18,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 19,
+        "last_triggered": "2026-10-04T05:18:40.002Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "output_safety",
+      "title": "Output safety",
+      "description": "Markdown images and links to unlisted domains, HTML, system-prompt canary.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "redact",
+      "directions": [
+        "output"
+      ],
+      "settings": {
+        "markdown_links.allow_domains": "bank.example, docs.bank.example",
+        "markdown_links.images": "redact",
+        "markdown_links.links": "redact",
+        "html": "strip",
+        "canary.enabled": true,
+        "canary.action": "block"
+      },
+      "owasp_llm": [
+        "LLM05",
+        "LLM02",
+        "LLM07"
+      ],
+      "owasp_agentic": [],
+      "atlas": [
+        "AML.T0057"
+      ],
+      "tests": {
+        "allow": 5,
+        "block": 8,
+        "total": 13,
+        "passed": 13,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 10,
+        "last_triggered": "2026-10-04T05:02:33.120Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "signatures",
+      "title": "Attack signatures feed",
+      "description": "Signed feed of historical attack patterns, refreshed without restart.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "input",
+        "tool_call",
+        "tool_result",
+        "tool_definition"
+      ],
+      "settings": {
+        "feed": "signatures/feed.json",
+        "require_signature": true,
+        "refresh_seconds": 30,
+        "feed.version": 7,
+        "feed.signatures": 18
+      },
+      "owasp_llm": [
+        "LLM01",
+        "LLM03",
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI04",
+        "ASI05"
+      ],
+      "atlas": [],
+      "tests": {
+        "allow": 6,
+        "block": 14,
+        "total": 20,
+        "passed": 20,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 10,
+        "last_triggered": "2026-10-04T04:40:00.330Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "supply_chain",
+      "title": "Model and tool supply chain",
+      "description": "Allowed model sources, no trust_remote_code, safetensors only, MCP server allowlist.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "tool_call",
+        "tool_definition"
+      ],
+      "settings": {
+        "model_sources_allow": "ollama:*, hf:Qwen/*, hf:meta-llama/*, hf:Cloudflare/*",
+        "block_trust_remote_code": true,
+        "require_safetensors": true,
+        "mcp.servers_allow": "demo-bank"
+      },
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0010"
+      ],
+      "tests": {
+        "allow": 3,
+        "block": 4,
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 0,
+        "last_triggered": null
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "mcp_pinning",
+      "title": "MCP tool definition pinning",
+      "description": "Hash of tool name, description and schema; a change after approval hides the tool until re-approved.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "block",
+      "directions": [
+        "tool_definition"
+      ],
+      "settings": {
+        "supply_chain.mcp.pin_tool_definitions": true,
+        "pinned_tools": 6
+      },
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0010"
+      ],
+      "tests": {
+        "allow": 3,
+        "block": 3,
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 0,
+        "last_triggered": "2026-10-04T04:40:00.330Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "approvals",
+      "title": "Human approval",
+      "description": "require_approval creates a request in the dashboard; approval allows exactly that call (arguments hash) for a limited time.",
+      "tiers": [
+        "T0"
+      ],
+      "enabled": true,
+      "mode": "enforce",
+      "action": "require_approval",
+      "directions": [
+        "tool_call"
+      ],
+      "settings": {
+        "ttl_seconds": 600
+      },
+      "owasp_llm": [
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI09"
+      ],
+      "atlas": [],
+      "tests": {
+        "allow": 3,
+        "block": 3,
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "last_run": "2026-10-04T05:16:00.000Z"
+      },
+      "triggers": {
+        "count_24h": 3,
+        "last_triggered": "2026-10-04T05:18:40.002Z"
+      },
+      "disabled_reason": null
+    },
+    {
+      "id": "harmful_content",
+      "title": "Harmful content (judge)",
+      "description": "T2 question 'harm' (cyberattack, fraud, violence, self-harm, hate), answered in the same judge pass.",
+      "tiers": [
+        "T2"
+      ],
+      "enabled": false,
+      "mode": null,
+      "action": null,
+      "directions": [],
+      "settings": {},
+      "owasp_llm": [
+        "LLM05"
+      ],
+      "owasp_agentic": [],
+      "atlas": [],
+      "tests": {
+        "allow": 0,
+        "block": 0,
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "last_run": null
+      },
+      "triggers": {
+        "count_24h": 0,
+        "last_triggered": null
+      },
+      "disabled_reason": "Section controls.harmful_content is commented out in policy/bouncer.yaml: no checks run."
+    }
+  ]
+}

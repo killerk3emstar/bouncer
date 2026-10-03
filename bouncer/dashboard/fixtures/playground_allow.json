@@ -1,0 +1,64 @@
+{
+  "trace_id": "tr_01K6P5ZXW9WSF8G0T23BWNAN3S",
+  "action": "allow",
+  "status_code": 200,
+  "reply": "The incident response runbook in three points:\n1. Contain: isolate affected systems and revoke exposed credentials.\n2. Assess: collect logs, identify scope and affected customers.\n3. Report: notify the security officer within 1 hour and regulators as required.",
+  "block": null,
+  "upstream_called": true,
+  "latency_ms": 378.2,
+  "events": [
+    {
+      "ts": "2026-10-04T03:30:21.345Z",
+      "seq": 82,
+      "trace_id": "tr_01K6P5ZXW9WSF8G0T23BWNAN3S",
+      "prev_hash": "90ec762ea4c732a02ae2225e9833a417358ae216d20af5474263b606224e5525",
+      "hash": "8fc20da70d52fee58e54a68b7532494793e7a406b7e20a88f19e970522d2ba6d",
+      "type": "decision",
+      "principal": {
+        "id": "playground",
+        "team": "security"
+      },
+      "session_id": "ses_ecf9eda81287",
+      "route": "openai.chat",
+      "direction": "input",
+      "model": "gpt-4o-mini",
+      "upstream": "commercial-mock",
+      "action": "allow",
+      "enforced": true,
+      "status_code": 200,
+      "findings": [],
+      "judge": {
+        "invoked": false,
+        "reason": null,
+        "backend": null,
+        "answers": {},
+        "latency_ms": 0,
+        "cached": false
+      },
+      "latency_ms": {
+        "t0": 1.37,
+        "t1": 22.8,
+        "t2": 0.0,
+        "upstream": 352.7,
+        "gateway_overhead": 25.5,
+        "total": 378.2
+      },
+      "usage": {
+        "prompt_tokens": 1886,
+        "completion_tokens": 230,
+        "cost_usd": 0.000421,
+        "gpu_seconds": 0.0,
+        "budget_left_usd": null
+      },
+      "policy": {
+        "version": "sha256:311ee7a340cbb7fb47c6e1cf448ad46f168ee9464000054281ae6ad104b6412b",
+        "profile": "balanced",
+        "mode": "enforce"
+      },
+      "tool": null,
+      "message": null,
+      "approval_id": null,
+      "excerpt": "Summarize the incident response runbook in three bullet points."
+    }
+  ]
+}

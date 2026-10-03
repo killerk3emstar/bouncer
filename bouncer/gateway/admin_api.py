@@ -498,8 +498,8 @@ def _policy_summary(g: Any) -> dict[str, Any]:
         "reload": {
             "status": "failed" if err else "ok",
             "at": _iso(err["at"]) if err else _iso(g.policies.last_reload_at),
-            "attempted_version": None if err else p.version,
-            "error": {"message": err["message"], "line": err.get("line"), "errors": err.get("errors", [])} if err else None,
+            "attempted_version": err.get("attempted_version") if err else p.version,
+            "error": _error_shape(err) if err else None,
             "reloads": g.policies.reload_count,
             "failed": g.policies.failed_count,
         },
@@ -524,29 +524,64 @@ def _policy_summary(g: Any) -> dict[str, Any]:
     }
 
 
+_JUDGE_HEALTH: dict[str, Any] = {"at": 0.0, "url": None, "value": None}
+
+
+async def judge_health(g: Any) -> dict[str, Any] | None:
+    """GET <judge.url>/health, cached for 10 s. None when the backend is in-process (fake) or none."""
+    jc = g.policies.current.doc.judge
+    backend = g.judge.backend
+    if backend in ("fake", "none"):
+        return {"healthy": True, "detail": f"{backend} backend runs in-process"} if backend == "fake" else None
+    now = time.time()
+    if _JUDGE_HEALTH["url"] == jc.url and now - _JUDGE_HEALTH["at"] < 10:
+        return _JUDGE_HEALTH["value"]
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=1.0) as c:
+            r = await c.get(jc.url.rstrip("/") + "/health")
+            body = r.json()
+            value = {"healthy": r.status_code == 200 and body.get("status") == "ok", "detail": body}
+    except Exception as exc:
+        value = {"healthy": False, "detail": f"{type(exc).__name__}: {exc}"[:200]}
+    _JUDGE_HEALTH.update({"at": now, "url": jc.url, "value": value})
+    return value
+
+
 @router.get("/api/policy")
 async def policy(request: Request) -> dict[str, Any]:
-    return _policy_summary(gw(request))
+    g = gw(request)
+    out = _policy_summary(g)
+    h = await judge_health(g)
+    if h is not None:
+        out["judge"]["healthy"] = h["healthy"]
+        out["judge"]["health"] = h["detail"]
+    return out
+
+
+def _error_shape(err: dict[str, Any]) -> dict[str, Any]:
+    return {k: err.get(k) for k in ("message", "path", "line", "column", "value", "snippet")}
 
 
 @router.get("/api/policy/versions")
 async def policy_versions(request: Request) -> dict[str, Any]:
     g = gw(request)
     out = []
-    err = g.policies.last_error
-    if err:
+    for rej in g.policies.rejected:
+        where = f"{rej.get('path')} = {rej.get('value')}" if rej.get("path") else rej["message"]
         out.append(
             {
-                "version": None,
-                "loaded_at": _iso(err["at"]),
+                "version": rej.get("attempted_version"),
+                "loaded_at": _iso(rej["at"]),
                 "status": "rejected",
                 "profile": None,
                 "mode": None,
-                "summary": f"Rejected: {err['message']}" + (f" (line {err['line']})" if err.get("line") else ""),
-                "error": {"message": err["message"], "line": err.get("line")},
-                "diff": None,
-                "source": None,
-                "previous_version": err.get("active_version"),
+                "summary": f"rejected: {where}" + (f" (line {rej['line']})" if rej.get("line") else ""),
+                "error": _error_shape(rej),
+                "diff": rej.get("diff"),
+                "source": rej.get("text"),
+                "previous_version": rej.get("active_version"),
                 "path": str(g.policies.path),
             }
         )
@@ -561,7 +596,7 @@ async def policy_versions(request: Request) -> dict[str, Any]:
                 "status": "active" if v["active"] else "superseded",
                 "profile": v["profile"],
                 "mode": v["mode"],
-                "summary": _diff_summary(diff) if diff else "Initial version loaded at startup",
+                "summary": _diff_summary(diff) if diff else "initial load",
                 "error": None,
                 "diff": diff,
                 "source": next((h.text for h in g.policies.history if h.version == v["version"]), None),
@@ -569,7 +604,8 @@ async def policy_versions(request: Request) -> dict[str, Any]:
                 "path": str(g.policies.path),
             }
         )
-    return {"versions": out}
+    out.sort(key=lambda v: v["loaded_at"] or "", reverse=True)
+    return {"versions": out[:20]}
 
 
 def _diff_summary(diff: str) -> str:

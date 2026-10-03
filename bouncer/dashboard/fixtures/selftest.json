@@ -1,0 +1,135 @@
+{
+  "started_at": "2026-10-04T05:30:00.000Z",
+  "duration_ms": 21430,
+  "mode": "offline",
+  "command": "make test",
+  "total": 180,
+  "passed": 179,
+  "failed": 1,
+  "skipped": 0,
+  "by_control": [
+    {
+      "control": "auth",
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "allow_cases": 4,
+      "block_cases": 6
+    },
+    {
+      "control": "budgets",
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "allow_cases": 4,
+      "block_cases": 6
+    },
+    {
+      "control": "loops",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "allow_cases": 3,
+      "block_cases": 5
+    },
+    {
+      "control": "secrets",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "allow_cases": 8,
+      "block_cases": 12
+    },
+    {
+      "control": "pii",
+      "total": 22,
+      "passed": 22,
+      "failed": 0,
+      "allow_cases": 9,
+      "block_cases": 13
+    },
+    {
+      "control": "obfuscation",
+      "total": 14,
+      "passed": 13,
+      "failed": 1,
+      "allow_cases": 5,
+      "block_cases": 9
+    },
+    {
+      "control": "prompt_injection",
+      "total": 26,
+      "passed": 26,
+      "failed": 0,
+      "allow_cases": 10,
+      "block_cases": 16
+    },
+    {
+      "control": "tool_governance",
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "allow_cases": 6,
+      "block_cases": 12
+    },
+    {
+      "control": "output_safety",
+      "total": 13,
+      "passed": 13,
+      "failed": 0,
+      "allow_cases": 5,
+      "block_cases": 8
+    },
+    {
+      "control": "signatures",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "allow_cases": 6,
+      "block_cases": 14
+    },
+    {
+      "control": "supply_chain",
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "allow_cases": 3,
+      "block_cases": 4
+    },
+    {
+      "control": "mcp_pinning",
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "allow_cases": 3,
+      "block_cases": 3
+    },
+    {
+      "control": "approvals",
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "allow_cases": 3,
+      "block_cases": 3
+    },
+    {
+      "control": "harmful_content",
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "allow_cases": 0,
+      "block_cases": 0
+    }
+  ],
+  "failures": [
+    {
+      "id": "obfuscation-block-rot13-override",
+      "control": "obfuscation",
+      "kind": "block",
+      "expected": "block",
+      "got": "allow",
+      "message": "ROT13-encoded 'Ignore all previous instructions' is not decoded (decode: base64, hex, url). Known gap."
+    }
+  ],
+  "report_url": "/reports/tests/index.html"
+}

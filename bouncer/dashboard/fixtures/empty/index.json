@@ -1,0 +1,15 @@
+{
+  "files": [
+    "approvals.json",
+    "budgets.json",
+    "controls.json",
+    "events.json",
+    "perf.json",
+    "scenarios.json",
+    "signatures.json",
+    "stats_1h.json",
+    "stats_24h.json",
+    "stats_7d.json",
+    "stream.json"
+  ]
+}

@@ -44,7 +44,7 @@ def build_state(
         telemetry.policy_reloads.labels("ok" if kind == "policy.reloaded" else "failed").inc()
         audit = holder.get("audit")
         if audit is not None:
-            audit.write({"type": kind, "trace_id": None, "route": "policy", **data})
+            audit.write({"type": kind, "trace_id": None, "route": "admin", **data})
 
     policies = PolicyManager(settings.policy_path, shared=shared, on_event=on_policy_event)
     policy = policies.load_initial()
@@ -118,6 +118,12 @@ def create_app(
         app.include_router(admin_api.router)
     except ImportError:
         log.warning("admin API not available")
+    try:
+        from bouncer.gateway import mcp_gateway
+
+        mcp_gateway.mount(app, state)  # /mcp (MCP gateway) + GET /api/mcp/tools
+    except ImportError:
+        log.warning("MCP gateway not available")
 
     @app.middleware("http")
     async def admin_auth(request: Request, call_next):  # noqa: ANN001, ANN202
@@ -128,6 +134,13 @@ def create_app(
             if auth != f"Bearer {token}" and request.query_params.get("token") != token:
                 return JSONResponse({"error": {"type": "unauthorized", "message": "Admin token required (Authorization: Bearer <BOUNCER_ADMIN_TOKEN>)."}}, status_code=401)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def no_cache_ui(request: Request, call_next):  # noqa: ANN001, ANN202
+        response = await call_next(request)
+        if request.url.path.startswith("/ui"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:

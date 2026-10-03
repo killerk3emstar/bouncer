@@ -1,0 +1,167 @@
+{
+  "approvals": [
+    {
+      "id": "apr_91ab",
+      "status": "pending",
+      "created_at": "2026-10-04T05:18:40.002Z",
+      "expires_at": "2026-10-04T05:43:40.002Z",
+      "trace_id": "tr_01K6SQF00YPEJ4N6G8HRDYZ3JV",
+      "principal": {
+        "id": "ops-copilot",
+        "team": "operations"
+      },
+      "session_id": "ses_fc4f032749da",
+      "route": "guard.check",
+      "tool": "payments.create_transfer",
+      "arguments": {
+        "from_account": "PL61 **** 0000",
+        "to_iban": "DE89 **** 3000",
+        "amount": 4800.0,
+        "currency": "EUR",
+        "reference": "Invoice 2026/09/114"
+      },
+      "arguments_hash": "sha256:f4baa47d52afb1253e496d9e8e8d034df4ca1b23d73d247cb9fa2a51799d2e4b",
+      "finding": "tool_governance.max-amount",
+      "reason": "payments.create_transfer amount 4800.00 EUR exceeds max_amount 1000 (above_max = require_approval).",
+      "owasp_llm": [
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI02",
+        "ASI09"
+      ],
+      "decided_at": null,
+      "decided_by": null,
+      "note": null
+    },
+    {
+      "id": "apr_7f3c",
+      "status": "pending",
+      "created_at": "2026-10-04T02:41:16.077Z",
+      "expires_at": "2026-10-04T05:37:12.000Z",
+      "trace_id": "tr_01K657P3Y3QJHBWAEQCFAD4G3D",
+      "principal": {
+        "id": "ops-copilot",
+        "team": "operations"
+      },
+      "session_id": "ses_c6060e1836d8",
+      "route": "openai.chat",
+      "tool": "mail.send",
+      "arguments": {
+        "to": "a***@vendor-pay.example",
+        "subject": "Customer list export",
+        "body": "[3,412 chars, contains 214 x [REDACTED:EMAIL], 214 x [REDACTED:IBAN]]"
+      },
+      "arguments_hash": "sha256:525eae9425265a11110ef3ca445c040e0f56c983dc451dbdc43026cddb465114",
+      "finding": "tool_governance.lethal_trifecta",
+      "reason": "Session read untrusted content (web.fetch) and customer data (crm.lookup_customer) and now sends mail to an external domain. T2: P(misaligned)=0.74, P(exfiltration)=0.94.",
+      "owasp_llm": [
+        "LLM06",
+        "LLM02"
+      ],
+      "owasp_agentic": [
+        "ASI01",
+        "ASI02"
+      ],
+      "decided_at": null,
+      "decided_by": null,
+      "note": null
+    },
+    {
+      "id": "apr_5d20",
+      "status": "approved",
+      "created_at": "2026-10-04T01:22:05.000Z",
+      "expires_at": "2026-10-04T01:32:05.000Z",
+      "trace_id": "tr_01K6F2TQAN91083EBDNAB5YH03",
+      "principal": {
+        "id": "ops-copilot",
+        "team": "operations"
+      },
+      "session_id": "ses_a9dcac636226",
+      "route": "openai.chat",
+      "tool": "payments.create_transfer",
+      "arguments": {
+        "from_account": "PL61 **** 0000",
+        "to_iban": "PL27 **** 4410",
+        "amount": 1250.0,
+        "currency": "PLN",
+        "reference": "Refund case 8812"
+      },
+      "arguments_hash": "sha256:9aa13387124a0a0efeb2e49e94cfb595fafd97ae7714accb1371e3872c499c1b",
+      "finding": "tool_governance.max-amount",
+      "reason": "payments.create_transfer amount 1250.00 PLN exceeds max_amount 1000.",
+      "owasp_llm": [
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI02",
+        "ASI09"
+      ],
+      "decided_at": "2026-10-04T01:24:51.000Z",
+      "decided_by": "admin",
+      "note": "Refund confirmed with the branch by phone."
+    },
+    {
+      "id": "apr_3c11",
+      "status": "denied",
+      "created_at": "2026-10-04T00:51:40.000Z",
+      "expires_at": "2026-10-04T01:01:40.000Z",
+      "trace_id": "tr_01K6MEFSW7MQ9E7VPVZ5SW9Q0D",
+      "principal": {
+        "id": "playground",
+        "team": "security"
+      },
+      "session_id": "ses_85bbcc66e941",
+      "route": "openai.chat",
+      "tool": "mail.send",
+      "arguments": {
+        "to": "x***@gmail.example",
+        "subject": "Q3 numbers",
+        "body": "[812 chars]"
+      },
+      "arguments_hash": "sha256:ec76ec91bbb57302ae0ab28cd728018a67bcb15e5640c8ad77bff0e04e8f416f",
+      "finding": "tool_governance.lethal_trifecta",
+      "reason": "Untrusted content + internal data + external recipient in one session.",
+      "owasp_llm": [
+        "LLM06",
+        "LLM02"
+      ],
+      "owasp_agentic": [
+        "ASI01",
+        "ASI02"
+      ],
+      "decided_at": "2026-10-04T00:53:02.000Z",
+      "decided_by": "admin",
+      "note": "Red-team test, denied as expected."
+    },
+    {
+      "id": "apr_0e77",
+      "status": "expired",
+      "created_at": "2026-10-04T00:12:00.000Z",
+      "expires_at": "2026-10-04T00:22:00.000Z",
+      "trace_id": "tr_01K61M325KZM1ZZGJH5ZZEBAP7",
+      "principal": {
+        "id": "dev-assistant",
+        "team": "engineering"
+      },
+      "session_id": "ses_4619456624a0",
+      "route": "openai.chat",
+      "tool": "code.run_python",
+      "arguments": {
+        "code": "[214 chars]"
+      },
+      "arguments_hash": "sha256:e287b040595f78e811bd824ac8874ac46e06e479c15ecbfef2f8059434353380",
+      "finding": "tool_governance.goal_alignment",
+      "reason": "T2 goal_alignment P(misaligned)=0.71 is above approval_above 0.60.",
+      "owasp_llm": [
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "decided_at": null,
+      "decided_by": null,
+      "note": null
+    }
+  ]
+}

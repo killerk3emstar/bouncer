@@ -1,0 +1,359 @@
+{
+  "window": "24h",
+  "from": "2026-10-03T05:30:00.000Z",
+  "to": "2026-10-04T05:30:00.000Z",
+  "generated_at": "2026-10-04T05:30:00.000Z",
+  "totals": {
+    "requests": 1882,
+    "allow": 1645,
+    "log": 72,
+    "redact": 84,
+    "require_approval": 15,
+    "block": 66
+  },
+  "usage": {
+    "prompt_tokens": 1528184,
+    "completion_tokens": 402748,
+    "cost_usd": 3.41,
+    "gpu_seconds": 1336.2
+  },
+  "series": {
+    "bucket_seconds": 3600,
+    "buckets": [
+      {
+        "ts": "2026-10-03T05:30:00.000Z",
+        "block": 2,
+        "require_approval": 0,
+        "redact": 5,
+        "log": 3,
+        "allow": 72
+      },
+      {
+        "ts": "2026-10-03T06:30:00.000Z",
+        "block": 3,
+        "require_approval": 2,
+        "redact": 4,
+        "log": 4,
+        "allow": 68
+      },
+      {
+        "ts": "2026-10-03T07:30:00.000Z",
+        "block": 3,
+        "require_approval": 0,
+        "redact": 3,
+        "log": 2,
+        "allow": 51
+      },
+      {
+        "ts": "2026-10-03T08:30:00.000Z",
+        "block": 3,
+        "require_approval": 0,
+        "redact": 2,
+        "log": 2,
+        "allow": 54
+      },
+      {
+        "ts": "2026-10-03T09:30:00.000Z",
+        "block": 2,
+        "require_approval": 0,
+        "redact": 4,
+        "log": 3,
+        "allow": 71
+      },
+      {
+        "ts": "2026-10-03T10:30:00.000Z",
+        "block": 2,
+        "require_approval": 2,
+        "redact": 2,
+        "log": 3,
+        "allow": 59
+      },
+      {
+        "ts": "2026-10-03T11:30:00.000Z",
+        "block": 3,
+        "require_approval": 0,
+        "redact": 4,
+        "log": 3,
+        "allow": 59
+      },
+      {
+        "ts": "2026-10-03T12:30:00.000Z",
+        "block": 3,
+        "require_approval": 0,
+        "redact": 2,
+        "log": 1,
+        "allow": 45
+      },
+      {
+        "ts": "2026-10-03T13:30:00.000Z",
+        "block": 2,
+        "require_approval": 0,
+        "redact": 3,
+        "log": 3,
+        "allow": 43
+      },
+      {
+        "ts": "2026-10-03T14:30:00.000Z",
+        "block": 2,
+        "require_approval": 1,
+        "redact": 3,
+        "log": 3,
+        "allow": 68
+      },
+      {
+        "ts": "2026-10-03T15:30:00.000Z",
+        "block": 3,
+        "require_approval": 2,
+        "redact": 2,
+        "log": 2,
+        "allow": 57
+      },
+      {
+        "ts": "2026-10-03T16:30:00.000Z",
+        "block": 4,
+        "require_approval": 0,
+        "redact": 2,
+        "log": 3,
+        "allow": 70
+      },
+      {
+        "ts": "2026-10-03T17:30:00.000Z",
+        "block": 2,
+        "require_approval": 1,
+        "redact": 3,
+        "log": 4,
+        "allow": 72
+      },
+      {
+        "ts": "2026-10-03T18:30:00.000Z",
+        "block": 2,
+        "require_approval": 0,
+        "redact": 1,
+        "log": 2,
+        "allow": 47
+      },
+      {
+        "ts": "2026-10-03T19:30:00.000Z",
+        "block": 2,
+        "require_approval": 0,
+        "redact": 3,
+        "log": 1,
+        "allow": 49
+      },
+      {
+        "ts": "2026-10-03T20:30:00.000Z",
+        "block": 2,
+        "require_approval": 2,
+        "redact": 3,
+        "log": 1,
+        "allow": 45
+      },
+      {
+        "ts": "2026-10-03T21:30:00.000Z",
+        "block": 4,
+        "require_approval": 0,
+        "redact": 5,
+        "log": 2,
+        "allow": 77
+      },
+      {
+        "ts": "2026-10-03T22:30:00.000Z",
+        "block": 3,
+        "require_approval": 1,
+        "redact": 3,
+        "log": 2,
+        "allow": 60
+      },
+      {
+        "ts": "2026-10-03T23:30:00.000Z",
+        "block": 2,
+        "require_approval": 0,
+        "redact": 5,
+        "log": 4,
+        "allow": 101
+      },
+      {
+        "ts": "2026-10-04T00:30:00.000Z",
+        "block": 2,
+        "require_approval": 2,
+        "redact": 6,
+        "log": 5,
+        "allow": 84
+      },
+      {
+        "ts": "2026-10-04T01:30:00.000Z",
+        "block": 3,
+        "require_approval": 0,
+        "redact": 4,
+        "log": 6,
+        "allow": 107
+      },
+      {
+        "ts": "2026-10-04T02:30:00.000Z",
+        "block": 3,
+        "require_approval": 0,
+        "redact": 4,
+        "log": 4,
+        "allow": 82
+      },
+      {
+        "ts": "2026-10-04T03:30:00.000Z",
+        "block": 4,
+        "require_approval": 0,
+        "redact": 5,
+        "log": 5,
+        "allow": 100
+      },
+      {
+        "ts": "2026-10-04T04:30:00.000Z",
+        "block": 5,
+        "require_approval": 2,
+        "redact": 6,
+        "log": 4,
+        "allow": 104
+      }
+    ]
+  },
+  "top_controls": [
+    {
+      "control": "pii",
+      "log": 28,
+      "redact": 51,
+      "require_approval": 0,
+      "block": 6,
+      "count": 85
+    },
+    {
+      "control": "prompt_injection",
+      "log": 19,
+      "redact": 0,
+      "require_approval": 0,
+      "block": 22,
+      "count": 41
+    },
+    {
+      "control": "secrets",
+      "log": 6,
+      "redact": 25,
+      "require_approval": 0,
+      "block": 0,
+      "count": 31
+    },
+    {
+      "control": "tool_governance",
+      "log": 0,
+      "redact": 0,
+      "require_approval": 15,
+      "block": 4,
+      "count": 19
+    },
+    {
+      "control": "budgets",
+      "log": 13,
+      "redact": 0,
+      "require_approval": 0,
+      "block": 4,
+      "count": 17
+    },
+    {
+      "control": "obfuscation",
+      "log": 6,
+      "redact": 0,
+      "require_approval": 0,
+      "block": 6,
+      "count": 12
+    },
+    {
+      "control": "output_safety",
+      "log": 0,
+      "redact": 8,
+      "require_approval": 0,
+      "block": 2,
+      "count": 10
+    },
+    {
+      "control": "signatures",
+      "log": 0,
+      "redact": 0,
+      "require_approval": 0,
+      "block": 10,
+      "count": 10
+    }
+  ],
+  "top_owasp": [
+    {
+      "id": "LLM02",
+      "name": "Sensitive Information Disclosure",
+      "count": 126
+    },
+    {
+      "id": "LLM01",
+      "name": "Prompt Injection",
+      "count": 53
+    },
+    {
+      "id": "ASI01",
+      "name": "Agent Goal Hijack",
+      "count": 53
+    },
+    {
+      "id": "ASI03",
+      "name": "Identity and Privilege Abuse",
+      "count": 37
+    },
+    {
+      "id": "LLM06",
+      "name": "Excessive Agency",
+      "count": 25
+    },
+    {
+      "id": "LLM10",
+      "name": "Unbounded Consumption",
+      "count": 21
+    },
+    {
+      "id": "ASI08",
+      "name": "Cascading Failures",
+      "count": 21
+    },
+    {
+      "id": "ASI02",
+      "name": "Tool Misuse and Exploitation",
+      "count": 19
+    }
+  ],
+  "latency_ms": {
+    "t0": {
+      "n": 1882,
+      "p50": 0.62,
+      "p95": 1.48
+    },
+    "t1": {
+      "n": 1336,
+      "p50": 13.1,
+      "p95": 24.7
+    },
+    "t2": {
+      "n": 31,
+      "p50": 1390.0,
+      "p95": 2710.0
+    },
+    "gateway_overhead": {
+      "n": 1882,
+      "p50": 15.2,
+      "p95": 41.8
+    },
+    "upstream": {
+      "n": 1816,
+      "p50": 842.0,
+      "p95": 2410.0
+    }
+  },
+  "t2": {
+    "escalations": 31,
+    "escalation_rate": 0.0165,
+    "cache_hits": 8,
+    "cache_hit_rate": 0.29,
+    "timeouts": 1
+  }
+}

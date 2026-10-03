@@ -1,0 +1,7 @@
+{
+  "files": [
+    "policy.json",
+    "policy_versions.json",
+    "signatures.json"
+  ]
+}

@@ -22,20 +22,52 @@ log = logging.getLogger("bouncer.policy")
 
 
 class PolicyError(Exception):
-    def __init__(self, message: str, line: int | None = None, errors: list[dict[str, Any]] | None = None):
+    def __init__(
+        self,
+        message: str,
+        line: int | None = None,
+        errors: list[dict[str, Any]] | None = None,
+        path: str | None = None,
+        column: int | None = None,
+        value: str | None = None,
+        snippet: list[dict[str, Any]] | None = None,
+    ):
         super().__init__(message)
         self.message = message
         self.line = line
         self.errors = errors or []
+        self.path = path
+        self.column = column
+        self.value = value
+        self.snippet = snippet or []
 
     def to_dict(self) -> dict[str, Any]:
-        return {"message": self.message, "line": self.line, "errors": self.errors}
+        return {
+            "message": self.message,
+            "path": self.path,
+            "line": self.line,
+            "column": self.column,
+            "value": self.value,
+            "snippet": self.snippet,
+            "errors": self.errors,
+        }
 
 
-def _node_line(root: yaml.Node | None, loc: tuple[Any, ...]) -> int | None:
-    """Walk a composed YAML node tree along a pydantic error location; return a 1-based line."""
+def _snippet(text: str, line: int | None, context: int = 2) -> list[dict[str, Any]]:
+    if not line:
+        return []
+    lines = text.splitlines()
+    lo, hi = max(1, line - context), min(len(lines), line + context)
+    return [{"line": i, "text": lines[i - 1]} for i in range(lo, hi + 1)]
+
+
+def _node_at(root: yaml.Node | None, loc: tuple[Any, ...]) -> tuple[int | None, int | None, str | None]:
+    """Walk a composed YAML node tree along a pydantic error location.
+
+    Returns (line, column, scalar value) of the deepest node found, 1-based."""
     node = root
     line = node.start_mark.line + 1 if node is not None else None
+    col = node.start_mark.column + 1 if node is not None else None
     for part in loc:
         if node is None:
             break
@@ -44,15 +76,23 @@ def _node_line(root: yaml.Node | None, loc: tuple[Any, ...]) -> int | None:
             for k, v in node.value:
                 if str(k.value) == str(part):
                     nxt = v
-                    line = k.start_mark.line + 1
+                    line, col = k.start_mark.line + 1, k.start_mark.column + 1
                     break
         elif isinstance(node, yaml.SequenceNode) and isinstance(part, int) and part < len(node.value):
             nxt = node.value[part]
-            line = nxt.start_mark.line + 1
+            line, col = nxt.start_mark.line + 1, nxt.start_mark.column + 1
         if nxt is None:
             break
         node = nxt
-    return line
+    value = None
+    if isinstance(node, yaml.ScalarNode):
+        value = str(node.value)
+        line, col = node.start_mark.line + 1, node.start_mark.column + 1
+    return line, col, value
+
+
+def _node_line(root: yaml.Node | None, loc: tuple[Any, ...]) -> int | None:
+    return _node_at(root, loc)[0]
 
 
 def parse_policy(text: str) -> PolicyDoc:
@@ -63,24 +103,32 @@ def parse_policy(text: str) -> PolicyDoc:
     except yaml.MarkedYAMLError as exc:
         mark = exc.problem_mark or exc.context_mark
         line = mark.line + 1 if mark else None
-        raise PolicyError(f"YAML syntax error: {exc.problem or exc}", line) from exc
+        col = mark.column + 1 if mark else None
+        raise PolicyError(f"YAML syntax error: {exc.problem or exc}", line, column=col, snippet=_snippet(text, line)) from exc
     if not isinstance(raw, dict):
-        raise PolicyError("Policy must be a YAML mapping at the top level", 1)
+        raise PolicyError("Policy must be a YAML mapping at the top level", 1, snippet=_snippet(text, 1))
     try:
         return PolicyDoc.model_validate(raw)
     except ValidationError as exc:
         errors = []
         for err in exc.errors():
             loc = tuple(p for p in err["loc"] if not (isinstance(p, str) and p.startswith("function-")))
-            # pydantic adds union/literal branch names to loc; keep only parts present in the YAML
-            line = _node_line(root, loc)
+            line, col, value = _node_at(root, loc)
             errors.append(
-                {"loc": ".".join(str(p) for p in loc), "line": line, "message": err["msg"], "type": err["type"]}
+                {"loc": ".".join(str(p) for p in loc), "line": line, "column": col, "value": value, "message": err["msg"], "type": err["type"]}
             )
         first = errors[0]
         where = f"{first['loc']}: " if first["loc"] else ""
         more = f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""
-        raise PolicyError(f"{where}{first['message']}{more}", first["line"], errors) from exc
+        raise PolicyError(
+            f"{where}{first['message']}{more}",
+            first["line"],
+            errors,
+            path=first["loc"] or None,
+            column=first["column"],
+            value=first["value"],
+            snippet=_snippet(text, first["line"]),
+        ) from exc
 
 
 @dataclass
@@ -107,6 +155,7 @@ class PolicyManager:
         self.on_event = on_event
         self.history: deque[PolicyVersion] = deque(maxlen=history_size)
         self.last_error: dict[str, Any] | None = None
+        self.rejected: deque[dict[str, Any]] = deque(maxlen=history_size)
         self.last_reload_at: float | None = None
         self.reload_count = 0
         self.failed_count = 0
@@ -161,19 +210,34 @@ class PolicyManager:
             doc = parse_policy(text)
             self._activate(doc, text)
         except PolicyError as exc:
-            self._fail(exc)
+            self._fail(exc, text)
             return False
         except Exception as exc:  # compile errors (bad regex etc.)
-            self._fail(PolicyError(f"Policy failed to compile: {type(exc).__name__}: {exc}"))
+            self._fail(PolicyError(f"Policy failed to compile: {type(exc).__name__}: {exc}"), text)
             return False
         self.reload_count += 1
         self.last_error = None
         log.info("policy reloaded: %s", self.current.version)
         return True
 
-    def _fail(self, exc: PolicyError) -> None:
+    def _fail(self, exc: PolicyError, text: str | None = None) -> None:
+        from bouncer.policy.compiled import policy_hash
+
         self.failed_count += 1
-        self.last_error = {**exc.to_dict(), "at": time.time(), "active_version": self._current.version if self._current else None}
+        self.last_error = {
+            **exc.to_dict(),
+            "at": time.time(),
+            "active_version": self._current.version if self._current else None,
+            "attempted_version": policy_hash(text) if text is not None else None,
+        }
+        if text is not None:
+            self.rejected.appendleft(
+                {
+                    **self.last_error,
+                    "text": text,
+                    "diff": self.diff_text(self._current.text, text) if self._current else "",
+                }
+            )
         log.warning("policy reload rejected (line %s): %s", exc.line, exc.message)
         if self.on_event:
             self.on_event("policy.reload_failed", dict(self.last_error))

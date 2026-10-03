@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bouncer Dashboard</title>
+<meta name="description" content="Bouncer AI control layer: decisions, controls, coverage, budgets and audit trail.">
+<script>
+  // Apply the saved theme before first paint.
+  try { var t = localStorage.getItem('bouncer.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2316161a'/%3E%3Cpath d='M4 3h5a3 3 0 0 1 0 6H4zM4 9h5.5a2.5 2.5 0 0 1 0 5H4z' fill='none' stroke='%23fff' stroke-width='1.6'/%3E%3C/svg%3E">
+</head>
+<body>
+<a class="skip" href="#view">Skip to content</a>
+<header class="top">
+  <a class="brand" href="#/overview">Bouncer</a>
+  <span class="brand-sub">AI control layer</span>
+  <a id="policy-chip" class="chip" href="#/policy" title="Active policy">policy –</a>
+  <span id="fixture-badge" class="fixture-badge" hidden></span>
+  <span class="spacer"></span>
+  <span id="clock" class="muted num" title="Current time"></span>
+  <div class="seg" role="group" aria-label="Time zone">
+    <button type="button" data-tz="local">Local</button><button type="button" data-tz="utc">UTC</button>
+  </div>
+  <button type="button" id="theme-btn" class="btn btn-ghost" title="Switch light or dark theme">Dark</button>
+  <button type="button" id="token-btn" class="btn btn-ghost" title="Admin token sent as Authorization: Bearer">Admin token</button>
+  <a class="btn btn-ghost" id="report-link" href="/reports/summary" target="_blank" rel="noopener" title="Printable one-page report for management, served by the gateway">Management report</a>
+</header>
+<div class="shell">
+  <nav class="side" aria-label="Sections">
+    <a href="#/overview" data-nav="overview">Overview</a>
+    <a href="#/events" data-nav="events">Events</a>
+    <a href="#/approvals" data-nav="approvals">Approvals <span id="nav-approvals" class="count" hidden></span></a>
+    <a href="#/controls" data-nav="controls">Controls</a>
+    <a href="#/coverage" data-nav="coverage">Coverage</a>
+    <a href="#/playground" data-nav="playground">Playground</a>
+    <a href="#/performance" data-nav="performance">Performance</a>
+    <a href="#/policy" data-nav="policy">Policy</a>
+    <a href="#/signatures" data-nav="signatures">Signatures</a>
+    <div class="side-foot">
+      <div>Exports</div>
+      <a href="#/events" title="Use the export buttons on the Events view; they apply the current filter">Audit JSONL / CSV</a>
+      <a href="/metrics" target="_blank" rel="noopener">Prometheus /metrics</a>
+    </div>
+  </nav>
+  <main id="view" tabindex="-1">
+    <div id="banner"></div>
+    <div id="view-body"></div>
+  </main>
+</div>
+
+<dialog id="token-dialog" class="dialog">
+  <form method="dialog">
+    <h3>Admin token</h3>
+    <p class="token-reason muted"></p>
+    <label class="field"><span>Token</span><input type="password" name="token" autocomplete="off" spellcheck="false"></label>
+    <p class="hint">Stored in this browser only (localStorage) and sent as <code>Authorization: Bearer &lt;token&gt;</code> on every /api call.</p>
+    <div class="row-end">
+      <button type="button" value="cancel" class="btn" data-cancel>Cancel</button>
+      <button type="submit" value="ok" class="btn btn-primary">Save token</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+<noscript><p style="padding:16px">The dashboard needs JavaScript. The audit log is also available at /api/export/audit.jsonl.</p></noscript>
+</body>
+</html>
