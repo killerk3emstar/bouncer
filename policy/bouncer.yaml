@@ -128,6 +128,7 @@ controls:
       CREDIT_CARD: block           # Luhn-validated
     output_visible_for_clearance: [confidential, restricted]   # these principals see PII in responses
     external_models: enforce       # enforce | off: PII never reaches a non-local model provider, whatever the clearance
+    internal_domains: [bank.example]   # e-mail addresses here are business contacts, not customer PII
 
   obfuscation:                     # OWASP LLM01
     strip_invisible: true          # zero-width characters, bidi controls

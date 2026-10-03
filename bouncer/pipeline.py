@@ -206,7 +206,10 @@ class Engine:
         for cid, control in ctx.variant.controls.items():
             try:
                 if control.applies_to(seg_clean):
-                    findings.extend(control.scan(seg_clean, views, ctx.scan))
+                    found = control.scan(seg_clean, views, ctx.scan)
+                    if cid == "pii":
+                        found = self._drop_internal_emails(ctx, clean, found)
+                    findings.extend(found)
             except Exception as exc:  # a failing control applies fail_mode
                 log.exception("control %s failed", cid)
                 findings.append(self._fail_finding(ctx, cid, f"{type(exc).__name__}: {exc}"))
@@ -218,6 +221,23 @@ class Engine:
         if key is not None:
             self.store.cache_put(key, (clean, [_copy_finding(f) for f in findings], views))
         return clean, findings, views
+
+    @staticmethod
+    def _drop_internal_emails(ctx: RequestCtx, text: str, findings: list[Finding]) -> list[Finding]:
+        """E-mail addresses at pii.internal_domains are business contacts (ops@bank.example), not PII."""
+        pii = ctx.doc.controls.pii
+        domains = [d.lower() for d in (pii.internal_domains if pii else [])]
+        if not domains:
+            return findings
+        out = []
+        for f in findings:
+            if f.rule == "EMAIL" and f.span is not None:
+                addr = text[f.span[0] : f.span[1]].lower()
+                dom = addr.rsplit("@", 1)[-1] if "@" in addr else ""
+                if dom and any(dom == d or dom.endswith("." + d) for d in domains):
+                    continue
+            out.append(f)
+        return out
 
     def _fail_finding(self, ctx: RequestCtx, control: str, error: str) -> Finding:
         closed = ctx.doc.defaults.fail_mode == "closed"

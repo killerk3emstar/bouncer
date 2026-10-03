@@ -123,6 +123,8 @@ class PiiCfg(ControlCfg):
     # PII sent to a model whose upstream is not local: entities configured as redact (or stronger)
     # are enforced even for cleared principals. off = clearance applies to every upstream.
     external_models: Literal["enforce", "off"] = "enforce"
+    # e-mail addresses at these domains (and subdomains) are business contacts, not customer PII
+    internal_domains: list[str] = []
 
 
 class ObfuscationCfg(ControlCfg):

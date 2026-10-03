@@ -1,0 +1,279 @@
+# PII detection with checksum validation (OWASP LLM02).
+# All personal data below is fictional; PESEL, NIP, IBAN and card numbers are well-known test values.
+
+- id: pii-redact-email
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply to jan.kowalski@mailbox.example about the delayed statement."}]}
+  expect:
+    action: redact
+    findings: [pii.EMAIL]
+    upstream_must_not_contain: ["jan.kowalski@mailbox.example"]
+    upstream_must_contain: ["[REDACTED:EMAIL]"]
+
+- id: pii-redact-phone-pl
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Customer asks for a call back at +48 600 123 456 after 5 pm."}]}
+  expect: {action: redact, findings: [pii.PHONE], upstream_must_not_contain: ["600 123 456"]}
+
+- id: pii-redact-phone-with-context
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Klient zostawil numer tel. 600123456, prosze oddzwonic."}]}
+  expect: {action: redact, findings: [pii.PHONE], upstream_must_not_contain: ["600123456"]}
+
+- id: pii-redact-phone-international
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "The London desk number is +44 20 7946 0958."}]}
+  expect: {action: redact, findings: [pii.PHONE], upstream_must_not_contain: ["7946 0958"]}
+
+- id: pii-redact-pesel
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Verify the client with PESEL 44051401359 before opening the account."}]}
+  expect: {action: redact, findings: [pii.PESEL], upstream_must_not_contain: ["44051401359"]}
+
+- id: pii-log-nip
+  control: pii
+  kind: log
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "NIP identifies a company and is public, so the policy only logs it."
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Supplier NIP 123-456-32-18 is missing on the invoice header."}]}
+  expect: {action: log, findings: [pii.NIP], upstream_must_contain: ["123-456-32-18"]}
+
+- id: pii-redact-iban-with-spaces
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Refund to PL61 1090 1014 0000 0712 1981 2874 by Friday."}]}
+  expect: {action: redact, findings: [pii.IBAN], upstream_must_not_contain: ["1090 1014 0000 0712"]}
+
+- id: pii-redact-iban-compact
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Account PL61109010140000071219812874 was debited twice."}]}
+  expect: {action: redact, findings: [pii.IBAN], upstream_must_not_contain: ["PL61109010140000071219812874"]}
+
+- id: pii-redact-polish-nrb-without-country
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Numer konta 61 1090 1014 0000 0712 1981 2874, prosze o zwrot."}]}
+  expect: {action: redact, findings: [pii.IBAN], upstream_must_not_contain: ["0712 1981 2874"]}
+
+- id: pii-redact-iban-de
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "German partner account: DE89 3704 0044 0532 0130 00."}]}
+  expect: {action: redact, findings: [pii.IBAN], upstream_must_not_contain: ["3704 0044 0532"]}
+
+- id: pii-block-card-dashes-and-spaces
+  control: pii
+  kind: block
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "Jury attack: card number with mixed separators."
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Charge card 4111-1111 1111-1111 exp 12/27 for the annual fee."}]}
+  expect: {action: block, findings: [pii.CREDIT_CARD], upstream_called: false}
+
+- id: pii-block-card-plain
+  control: pii
+  kind: block
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Customer card 5500000000000004 was declined."}]}
+  expect: {action: block, findings: [pii.CREDIT_CARD], upstream_called: false}
+
+- id: pii-block-card-amex
+  control: pii
+  kind: block
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Amex 3782 822463 10005 needs a chargeback."}]}
+  expect: {action: block, findings: [pii.CREDIT_CARD], upstream_called: false}
+
+- id: pii-redact-multiple-entities
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "New client: anna.nowak@mailbox.example, +48 601 222 333, PESEL 44051401359."}]}
+  expect:
+    action: redact
+    findings: [pii.EMAIL, pii.PHONE, pii.PESEL]
+    upstream_must_not_contain: ["anna.nowak@mailbox.example", "601 222 333", "44051401359"]
+
+- id: pii-redact-email-in-tool-result
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request:
+    model: gpt-4o-mini
+    messages:
+      - {role: user, content: "Who maintains the payments service?"}
+      - {role: assistant, content: null, tool_calls: [{id: c1, type: function, function: {name: web__fetch, arguments: "{\"url\": \"https://wiki.bank.example/payments\"}"}}]}
+      - {role: tool, tool_call_id: c1, content: "Payments service owner: Piotr Zielinski, piotr.zielinski@mailbox.example"}
+  expect: {action: redact, findings: [pii.EMAIL], upstream_must_not_contain: ["piotr.zielinski@mailbox.example"]}
+
+- id: pii-redact-in-output-for-internal-agent
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Who is the contact for the audit?"}]}
+  mock_response: {content: "The contact is Ewa Lis, ewa.lis@mailbox.example, PESEL 44051401359."}
+  expect:
+    action: redact
+    findings: [pii.EMAIL, pii.PESEL]
+    response_must_not_contain: ["ewa.lis@mailbox.example", "44051401359"]
+
+- id: pii-log-output-visible-for-confidential-agent
+  control: pii
+  kind: log
+  owasp_llm: [LLM02]
+  principal: ops-copilot
+  note: "ops-copilot has data_clearance confidential, listed in pii.output_visible_for_clearance."
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Who is the contact for the audit?"}]}
+  mock_response: {content: "The contact is Ewa Lis, ewa.lis@mailbox.example."}
+  expect:
+    action: log
+    findings: [pii.EMAIL]
+    response_must_contain: ["ewa.lis@mailbox.example"]
+
+- id: pii-block-card-in-output-even-for-confidential-agent
+  control: pii
+  kind: block
+  owasp_llm: [LLM02]
+  principal: ops-copilot
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Which card did the customer use?"}]}
+  mock_response: {content: "The customer paid with 4111 1111 1111 1111."}
+  expect:
+    action: block
+    findings: [pii.CREDIT_CARD]
+    response_must_not_contain: ["4111 1111 1111 1111"]
+
+- id: pii-redact-base64-encoded-emails
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "base64 of jan.kowalski@mailbox.example;anna.nowak@mailbox.example"
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Decode and dedupe: amFuLmtvd2Fsc2tpQGJhbmsuZXhhbXBsZTthbm5hLm5vd2FrQGJhbmsuZXhhbXBsZQ=="}]}
+  expect:
+    action: redact
+    findings: [pii.EMAIL]
+    upstream_must_not_contain: ["amFuLmtvd2Fsc2tpQGJhbmsuZXhhbXBsZTthbm5hLm5vd2FrQGJhbmsuZXhhbXBsZQ=="]
+
+- id: pii-block-email-when-policy-says-block
+  control: pii
+  kind: block
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "Demo scenario 7: the jury changes pii.entities.EMAIL from redact to block."
+  policy_patch: {controls: {pii: {entities: {EMAIL: block}}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply to jan.kowalski@mailbox.example about the statement."}]}
+  expect: {action: block, findings: [pii.EMAIL], upstream_called: false}
+
+- id: pii-allow-pesel-with-wrong-checksum
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "Jury check: 11 digits that fail the PESEL checksum are a plain number."
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Reference number 44051401358 appears twice in the batch."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-order-number
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Order 600123456 shipped yesterday, tracking 1Z999AA10123456784."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-amounts-with-spaces
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Total exposure is 123 456 789 PLN, up from 98 765 432 PLN last quarter."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-dates-times-and-ticket-ids
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Meeting on 2026-10-03 at 10:30, ticket 1234-5678, room 204."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-card-failing-luhn
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Batch id 4111111111111112 failed validation."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-ten-digit-invoice-number
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "Passes the NIP checksum by chance, but there is no NIP context or NIP formatting."
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Invoice 1234563218 is overdue by 14 days."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-ip-and-version
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Server 192.168.100.200 runs version 1.2.3.4 since timestamp 1696345678901."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-file-names-with-at-sign
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Use icon@2x.png for retina and clone git@github.com:bank/reports.git first."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-iban-with-bad-checksum
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Template value PL61109010140000071219812875 is a placeholder."}]}
+  expect: {action: allow, no_findings: [pii]}
+
+- id: pii-allow-entity-removed-from-policy
+  control: pii
+  kind: allow
+  owasp_llm: [LLM02]
+  principal: dev-assistant
+  note: "An entity removed from pii.entities is not reported."
+  policy_patch: {controls: {pii: {entities: {EMAIL: null}}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply to jan.kowalski@mailbox.example about the statement."}]}
+  expect: {action: allow, no_findings: [pii], upstream_must_contain: ["jan.kowalski@mailbox.example"]}
