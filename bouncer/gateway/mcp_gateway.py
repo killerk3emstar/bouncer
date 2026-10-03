@@ -47,7 +47,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.providers.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool, ToolResult
 from mcp.shared.exceptions import MCPError
-from mcp_types import TextContent
+from mcp_types import EmbeddedResource, TextContent, TextResourceContents
 from starlette.requests import Request
 from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -657,6 +657,12 @@ class BouncerMcpMiddleware(Middleware):
         untrusted = tg is not None and name in tg.untrusted_source_tools
         content = list(result.content or [])
         texts = [(i, b.text) for i, b in enumerate(content) if isinstance(b, TextContent)]
+        # text inside embedded resources reaches the model too, so it is scanned like any other text
+        texts += [
+            (i, b.resource.text)
+            for i, b in enumerate(content)
+            if isinstance(b, EmbeddedResource) and isinstance(b.resource, TextResourceContents) and b.resource.text
+        ]
         seen = {t for _, t in texts}
         leaves = [s for s in dict.fromkeys(_string_leaves(result.structured_content)) if s not in seen and s.strip()]
         segs = [Segment(t, "tool_result", f"tool_result:{name}", not untrusted, ("content", i), tool=name) for i, t in texts]
@@ -681,7 +687,8 @@ class BouncerMcpMiddleware(Middleware):
             red = [f for f in seg_findings if (f.effective_action or f.action) == Action.REDACT and f.span is not None]
             replaced[seg.text] = apply_redactions(clean, red)
         first = replaced.get(texts[0][1], "") if texts else ""
-        ctx.excerpt = f"{name} -> {first}"[: doc.audit.excerpt_chars]
+        # the audit excerpt masks every secret and PII value, also when the result is blocked
+        ctx.excerpt = f"{name} -> {engine.audit_mask(ctx, first, 'tool_result')}"[: doc.audit.excerpt_chars]
         mcp_info["upstream_is_error"] = bool(result.is_error)
         if rdecision.blocked:
             engine.finish(ctx, overall, direction="tool_result", extra={"mcp": mcp_info})
@@ -699,8 +706,16 @@ class BouncerMcpMiddleware(Middleware):
         for b in content:
             if isinstance(b, TextContent) and b.text in replaced and replaced[b.text] != b.text:
                 new_content.append(b.model_copy(update={"text": replaced[b.text]}))
-            else:
+            elif isinstance(b, EmbeddedResource) and isinstance(b.resource, TextResourceContents):
+                text = b.resource.text
+                if text in replaced and replaced[text] != text:
+                    b = b.model_copy(update={"resource": b.resource.model_copy(update={"text": replaced[text]})})
                 new_content.append(b)
+            elif isinstance(b, TextContent):
+                new_content.append(b)
+            else:
+                # images, audio, binary blobs and links cannot be checked as text: withheld
+                new_content.append(TextContent(type="text", text=f"[Bouncer: {getattr(b, 'type', 'non-text')} content from {name} withheld; only text results are passed through]"))
         structured = _map_strings(result.structured_content, lambda s: replaced.get(s, s)) if result.structured_content is not None else None
         meta = dict(result.meta or {})
         meta["bouncer"] = {"action": overall.label, "trace_id": ctx.trace_id, "policy_version": ctx.policy.version}

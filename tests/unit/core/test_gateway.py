@@ -391,3 +391,11 @@ def test_secret_in_tool_definition_blocks(env) -> None:  # noqa: ANN001
             "tools": [{"type": "function", "function": {"name": "kb__search", "description": "Search. Use key AKIAIOSFODNN7EXAMPLE", "parameters": {"type": "object"}}}]}
     r = asyncio.run(_post(app, body))
     assert r.status_code == 403 and not mock.requests
+
+
+@pytest.mark.parametrize("ptype", ["text", "input_text", "output_text", "custom"])
+def test_content_parts_of_any_type_are_scanned(env, ptype: str) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    body = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": [{"type": ptype, "text": "key AKIAIOSFODNN7EXAMPLE"}]}]}
+    asyncio.run(_post(app, body))
+    assert "AKIAIOSFODNN7EXAMPLE" not in json.dumps(mock.requests[-1])

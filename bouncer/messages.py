@@ -36,7 +36,8 @@ def content_parts(content: Any) -> list[tuple[tuple[Any, ...], str]]:
     out = []
     if isinstance(content, list):
         for j, part in enumerate(content):
-            if isinstance(part, dict) and part.get("type") in ("text", "input_text") and isinstance(part.get("text"), str):
+            # any part with a text field reaches the model as text, whatever its declared type
+            if isinstance(part, dict) and isinstance(part.get("text"), str):
                 out.append((("content", j, "text"), part["text"]))
     return out
 
