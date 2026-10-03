@@ -92,6 +92,10 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):  # noqa: ANN202
         tasks = []
+        clf = state.engine.classifier
+        if clf is not None and settings.watch:
+            # load and warm up T1 in the background so the first request does not pay for it
+            tasks.append(asyncio.create_task(asyncio.to_thread(clf.score, ["warm-up request for the injection classifier"])))
         if settings.watch:
             tasks.append(asyncio.create_task(_watch_policy(state)))
             tasks.append(asyncio.create_task(_refresh_feed(state)))

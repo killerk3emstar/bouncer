@@ -390,7 +390,15 @@ class Engine:
         if pi is not None:
             findings.extend(await self._semantic_injection(ctx, cleaned, pi))
 
-        # tool definitions: MCP-style poisoning is covered by heuristics/signatures on tool_definition segments
+        # an approved identical input passes its require_approval findings
+        ctx.excerpt = _excerpt(body, doc.audit.excerpt_chars)
+        if any(f.action == Action.REQUIRE_APPROVAL for f in findings):
+            appr = self.store.approved(ctx.principal.id, call_hash("input", ctx.excerpt))
+            if appr is not None:
+                for f in findings:
+                    if f.action == Action.REQUIRE_APPROVAL:
+                        f.action = Action.LOG
+                        f.message += f" Approved by a human ({appr.id})."
         action = self.finalize(ctx, findings)
         # write back: invisible characters stripped and redactions applied
         for seg, clean, seg_findings in cleaned:
@@ -402,7 +410,6 @@ class Engine:
             if f.effective_action == Action.REDACT and f.span is None and f.control in REDACTION_CONTROLS and f.view != "raw":
                 pass  # decoded-view findings carry the blob span; normalized-view ones are emitted as block by controls
         ctx.findings.extend(findings)
-        ctx.excerpt = _excerpt(body, doc.audit.excerpt_chars)
         return self._decision(ctx, findings, action, phase="input")
 
     async def _semantic_injection(
@@ -455,7 +462,7 @@ class Engine:
                             "prompt_injection",
                             "classifier",
                             Action.BLOCK,
-                            f"T1 classifier scored {seg.source} at {score:.2f} for prompt injection (block_above "
+                            f"T1 classifier scored {describe_source(seg.source)} at {score:.2f} for prompt injection (block_above "
                             f"{pi.classifier.block_above}). Remove the instructions aimed at the assistant, or lower "
                             "the threshold if this is a false positive.",
                             tier="T1",
@@ -489,7 +496,7 @@ class Engine:
                         "prompt_injection",
                         "grey_zone",
                         Action.LOG,
-                        f"{seg.source} needed a T2 review ({reason}) but the judge is disabled; recorded only.",
+                        f"{describe_source(seg.source).capitalize()} needed a T2 review ({reason}) but the judge is disabled; recorded only.",
                         tier="T1",
                         severity="low",
                         score=score or 0.0,
@@ -520,7 +527,7 @@ class Engine:
                     "prompt_injection",
                     "judge",
                     act,
-                    f"T2 judge ({res.get('backend')}) rated {seg.source} as an injection attempt with p={p_yes:.2f} "
+                    f"T2 judge ({res.get('backend')}) rated {describe_source(seg.source)} as an injection attempt with p={p_yes:.2f} "
                     f"(escalated: {reason}); {verb}. Review the content source before letting the agent act on it.",
                     tier="T2",
                     severity="high",
@@ -1024,6 +1031,19 @@ def _excerpt(body: dict[str, Any], n: int) -> str:
         if isinstance(m, dict) and m.get("role") in ("user", "tool") and isinstance(m.get("content"), str):
             return m["content"][:n]
     return ""
+
+
+def describe_source(source: str) -> str:
+    """Human wording for a segment source in block messages."""
+    role, _, tool = source.partition(":")
+    return {
+        "user": "the user message",
+        "system": "the system prompt",
+        "assistant": "the model output",
+        "tool_result": f"the result of {tool}",
+        "tool_definition": f"the definition of tool {tool}",
+        "tool_call": f"the arguments of {tool}",
+    }.get(role, source)
 
 
 def _clip(text: str, n: int) -> str:
