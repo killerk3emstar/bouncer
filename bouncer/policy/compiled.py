@@ -131,6 +131,8 @@ def build_variant(doc: PolicyDoc, profile: str, shared: dict[str, Any]) -> Polic
             cls = getattr(importlib.import_module(module), cls_name)
             if cid == "signatures":
                 controls[cid] = cls(cfg, vdoc, store=shared.get("feed_store"))
+                # one feed store for every profile variant and every later reload
+                shared.setdefault("feed_store", getattr(controls[cid], "store", None))
             else:
                 controls[cid] = cls(cfg, vdoc)
         except ModuleNotFoundError as exc:
