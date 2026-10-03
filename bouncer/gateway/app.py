@@ -51,6 +51,7 @@ def build_state(
     audit = AuditLog(settings.audit_path or policy.doc.audit.path, policy.doc.audit.hash_chain)
     holder["audit"] = audit
     store = Store()
+    store.replay_spend(audit.events)  # daily budgets survive a gateway restart
     clf = build_classifier(settings) if classifier == "default" else classifier
     gw_state = GatewayState(
         settings=settings,

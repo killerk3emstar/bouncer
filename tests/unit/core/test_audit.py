@@ -64,3 +64,15 @@ def test_query_filters_and_csv(tmp_path: Path) -> None:
     csv_text = to_csv(log.query())
     assert csv_text.splitlines()[0].startswith("ts,seq,trace_id")
     assert "secrets.jwt" in csv_text
+
+
+def test_store_replays_todays_spend_from_audit(tmp_path: Path) -> None:
+    from bouncer.store import Store
+
+    log = AuditLog(tmp_path / "a.jsonl")
+    log.write({"type": "decision", "trace_id": "a", "principal": {"id": "p", "team": "operations"}, "session_id": "s1", "usage": {"cost_usd": 0.25}})
+    log.write({"type": "decision", "trace_id": "b", "principal": {"id": "p", "team": "operations"}, "session_id": "s1", "usage": {"cost_usd": 0.5}})
+    store = Store()
+    assert store.replay_spend(AuditLog(tmp_path / "a.jsonl").events) == 2
+    assert abs(store.team_spend_today("operations") - 0.75) < 1e-9
+    assert abs(store.sessions["s1"].usd - 0.75) < 1e-9

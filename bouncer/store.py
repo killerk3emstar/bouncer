@@ -104,6 +104,29 @@ class Store:
             self.sessions[session_id].usd += usd
             self.team_requests[team] += 1
 
+    def replay_spend(self, events: Any) -> int:
+        """Rebuild today's per-team and per-session spend from audit events (after a restart).
+
+        With several replicas these counters live in Redis instead and survive restarts on their own."""
+        today = day_key()
+        n = 0
+        for ev in events:
+            if ev.get("type", "decision") != "decision":
+                continue
+            ts = str(ev.get("ts", ""))
+            if not ts.startswith(today):
+                continue
+            usage = ev.get("usage") or {}
+            team = (ev.get("principal") or {}).get("team")
+            cost = float(usage.get("cost_usd") or 0)
+            if team and cost:
+                self.team_usd[(team, today)] += cost
+                self.sessions[ev.get("session_id", "")].usd += cost
+            if team:
+                self.team_requests[team] += 1
+            n += 1
+        return n
+
     def tokens_last_minute(self, team: str) -> int:
         return int(self._window_sum(self.team_tokens[team], 60))
 
