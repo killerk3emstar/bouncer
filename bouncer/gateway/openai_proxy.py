@@ -13,9 +13,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from bouncer.core import Action, Finding, Principal
+from bouncer.gateway.state import GatewayState
 from bouncer.messages import estimate_tokens, request_text
 from bouncer.pipeline import Decision, RequestCtx, apply_redactions
-from bouncer.gateway.state import GatewayState
 
 log = logging.getLogger("bouncer.proxy")
 router = APIRouter()

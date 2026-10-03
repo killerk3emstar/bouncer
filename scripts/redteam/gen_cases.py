@@ -26,7 +26,7 @@ CONTROL_OF = {
 }
 
 
-import json as _json
+import json as _json  # noqa: E402  (kept next to its only use)
 
 
 def q(s: str) -> str:

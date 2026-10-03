@@ -28,7 +28,7 @@ def render_summary(stats: dict[str, Any], coverage: dict[str, Any], budgets: dic
     ov = lat.get("gateway_overhead", {})
     posture = coverage["posture"]
     rows_budget = "".join(
-        f"<tr><td>{_e(b['team'])}</td><td class=n>${b['spent_usd']:.4f}</td><td class=n>{'$%.2f' % b['usd_per_day'] if b['usd_per_day'] is not None else '-'}</td>"
+        f"<tr><td>{_e(b['team'])}</td><td class=n>${b['spent_usd']:.4f}</td><td class=n>{f"${b['usd_per_day']:.2f}" if b['usd_per_day'] is not None else '-'}</td>"
         f"<td class={'bad' if b['state'] == 'exceeded' else ('warn' if b['state'] == 'warning' else '')}>{_e(b['state'])}</td></tr>"
         for b in budgets["teams"]
     )

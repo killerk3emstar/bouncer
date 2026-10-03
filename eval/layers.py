@@ -24,6 +24,19 @@ FLAG_ACTIONS = {"block", "require_approval"}
 ATTACK_CONTROLS = {"prompt_injection", "signatures", "obfuscation", "supply_chain"}
 
 
+def _kinds() -> dict[str, str]:
+    """text -> dataset kind, so the pipeline layer can route indirect injections as tool results."""
+    import json
+
+    out: dict[str, str] = {}
+    for path in (ROOT / "eval" / "datasets").glob("*.jsonl"):
+        for line in path.read_text().splitlines():
+            if line.strip():
+                row = json.loads(line)
+                out[row["text"]] = row.get("kind", "")
+    return out
+
+
 class GatewayLayer:
     def __init__(self, name: str, t1: str, judge: str | None, source: str = "user") -> None:
         from bouncer.gateway.app import build_state
@@ -44,6 +57,7 @@ class GatewayLayer:
         self.principal = self.g.policies.current.principal("playground")
         self.loop = asyncio.new_event_loop()
         self.errors = 0
+        self.kinds = _kinds() if source == "auto" else {}
 
     def _flagged(self, body: dict[str, Any]) -> tuple[bool, float]:
         hits = [
@@ -61,7 +75,10 @@ class GatewayLayer:
         out = []
         for i, text in enumerate(texts):
             self.g.store.reset()
-            req = GuardRequest(text=text, direction="input" if self.source == "user" else "tool_result", source=self.source, session_id=f"eval-{i}")
+            source = self.source
+            if source == "auto":  # indirect injections arrive as tool results, everything else as a user message
+                source = "tool_result:web.fetch" if self.kinds.get(text) == "indirect" else "user"
+            req = GuardRequest(text=text, direction="input" if source == "user" else "tool_result", source=source, session_id=f"eval-{i}")
             t = time.perf_counter()
             res = self.loop.run_until_complete(run_guard(self.g, self.principal, req, route="guard.check"))
             ms = (time.perf_counter() - t) * 1000
@@ -75,7 +92,7 @@ class GatewayLayer:
 
 def t0() -> GatewayLayer:
     """Deterministic controls only: normalization, heuristics, signatures (no T1, no T2)."""
-    return GatewayLayer("t0", t1="off", judge="none")
+    return GatewayLayer("t0", t1="off", judge="none", source="auto")
 
 
 def _require_judge() -> None:
@@ -94,9 +111,10 @@ def _require_judge() -> None:
 
 
 def pipeline() -> GatewayLayer:
-    """T0 + T1 (ONNX) + T2 judge from the policy (Clef on :8701)."""
+    """T0 + T1 (ONNX) + T2 judge from the policy (Clef on :8701). Indirect-injection texts are sent as
+    web.fetch results, everything else as a user message, which is how they reach the gateway in practice."""
     _require_judge()
-    return GatewayLayer("pipeline", t1="onnx", judge=None)
+    return GatewayLayer("pipeline", t1="onnx", judge=None, source="auto")
 
 
 def pipeline_tool_result() -> GatewayLayer:
