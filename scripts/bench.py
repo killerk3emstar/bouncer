@@ -692,9 +692,9 @@ def analysis(result: dict[str, Any]) -> list[str]:
         if t1_hi and t1_lo:
             lines.append(
                 f"- T1 p50 grows from {fmt(t1_lo)} ms at 1 client to {fmt(t1_hi)} ms at {hi['concurrency']} clients. The ONNX classifier "
-                "runs one inference at a time (one session behind a lock in `bouncer/t1/classifier.py`), so requests queue for it and "
-                f"throughput is capped near 1000 / T1 time = {1000 / t1_lo:.0f} req/s for short prompts. Without T1 the same path "
-                "costs well under 1 ms (see `benign_repeat`, where the T1 result is cached)."
+                f"runs at most {os.environ.get('T1_CONCURRENCY', '3')} inferences at once (`T1_CONCURRENCY`, one shared session in "
+                "`bouncer/t1/classifier.py`), so under load requests queue for it; more workers or replicas scale it further. "
+                "Without T1 the same path costs well under 1 ms (see `benign_repeat`, where the T1 result is cached)."
             )
     for s in result["scenarios"]:
         esc = s["layers"].get("t2_escalations") or {}

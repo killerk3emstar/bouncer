@@ -178,7 +178,9 @@ class OnnxInjectionClassifier:
         self._tokenizer = tokenizer
         self._injection_index = injection_index
         self._load_lock = threading.Lock()
-        self._infer_lock = threading.Lock()
+        # ONNX Runtime sessions are thread-safe; a small number of concurrent inferences raises
+        # throughput under load without oversubscribing the CPU (each run uses intra_op threads)
+        self._infer_lock = threading.BoundedSemaphore(max(1, int(os.environ.get("T1_CONCURRENCY", "3"))))
         self._loaded = session is not None and tokenizer is not None
         self.load_seconds: float | None = None
         if self._loaded:
