@@ -1,0 +1,18 @@
+# Keep the build context small and free of secrets and local state.
+.git
+.gitignore
+.venv
+.env
+.claude
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+node_modules
+
+# Large or machine-local: mounted at run time instead (see docker-compose.yml).
+models
+data
+reports
+presentation

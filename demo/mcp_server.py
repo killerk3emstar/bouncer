@@ -36,8 +36,8 @@ from starlette.responses import JSONResponse
 from demo import tools as demo_tools
 
 SERVER_NAME = "demo-bank"
-HOST = "127.0.0.1"
-PORT = 8703
+HOST = os.environ.get("MCP_HOST", "127.0.0.1")
+PORT = int(os.environ.get("MCP_PORT", "8703"))
 POISONED_TOOL = "kb.search"
 
 # Tool-poisoning payload. Hidden instructions inside a tool description, the shape

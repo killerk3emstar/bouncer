@@ -1,0 +1,158 @@
+# Bouncer stack. Full guide: docs/RUNNING.md.
+#
+#   docker compose up -d --build        gateway :8700 + simulated upstream :8702 + demo MCP :8703 + feed :8704
+#   docker compose run --rm tests       offline test suite (no network, no models), reports in ./reports/tests
+#   docker compose --profile cpu-judge up -d    adds the T2 judge (ollama-guard backend, needs Ollama on the host)
+#   docker compose --profile redis up -d        adds Redis on :6390 (reserved for multi-replica budgets; not used by this build)
+#
+# Ports are bound to 127.0.0.1 only. Host ports can be changed without editing this file:
+#   BOUNCER_HOST_PORT, MOCK_HOST_PORT, MCP_HOST_PORT, FEED_HOST_PORT, JUDGE_HOST_PORT, REDIS_HOST_PORT
+#
+# Policy: the gateway reads ./policy/bouncer.yaml (bind-mounted, read-only) and rewrites its localhost
+# URLs for the container network (docker/gateway_entrypoint.py). Edit the file on the host and the
+# gateway hot-reloads it, as with `make dev`.
+
+name: bouncer
+
+x-app: &app
+  image: bouncer:local
+  build:
+    context: .
+    target: runtime
+  init: true
+  restart: unless-stopped
+
+x-health: &health
+  interval: 10s
+  timeout: 5s
+  retries: 6
+  start_period: 30s
+
+services:
+  gateway:
+    <<: *app
+    command: ["python", "docker/gateway_entrypoint.py"]
+    environment:
+      BOUNCER_HOST: 0.0.0.0
+      BOUNCER_PORT: "8700"
+      BOUNCER_POLICY_SOURCE: policy/bouncer.yaml
+      BOUNCER_POLICY: /tmp/bouncer-policy/bouncer.yaml
+      # FROM=TO pairs applied to the policy text. The judge default assumes the cpu-judge profile;
+      # on a Mac with `make judge` running natively, set BOUNCER_DOCKER_JUDGE_URL=http://host.docker.internal:8701.
+      BOUNCER_URL_REWRITES: >-
+        http://localhost:8702=http://mock:8702,
+        http://127.0.0.1:8702=http://mock:8702,
+        http://localhost:11434=${BOUNCER_DOCKER_OLLAMA_URL:-http://host.docker.internal:11434},
+        http://127.0.0.1:11434=${BOUNCER_DOCKER_OLLAMA_URL:-http://host.docker.internal:11434},
+        http://localhost:8701=${BOUNCER_DOCKER_JUDGE_URL:-http://judge:8701},
+        http://127.0.0.1:8701=${BOUNCER_DOCKER_JUDGE_URL:-http://judge:8701}
+      BOUNCER_MCP_UPSTREAM: http://mcp:8703/mcp
+      # auto = ONNX classifier when ./models/deberta-pi-v2/onnx/model.onnx exists (make models), else the fake one
+      BOUNCER_T1: ${BOUNCER_DOCKER_T1:-auto}
+      T1_MODEL_PATH: models/deberta-pi-v2/onnx
+      # Default "fake": the deterministic judge stand-in, so the stack works on any machine without a model.
+      # For a real judge: BOUNCER_DOCKER_JUDGE= (empty, use judge.backend from the policy) together with
+      # `--profile cpu-judge` or a native `make judge` on the Mac (see docs/RUNNING.md).
+      BOUNCER_JUDGE: ${BOUNCER_DOCKER_JUDGE-fake}
+      BOUNCER_ADMIN_TOKEN: ${BOUNCER_ADMIN_TOKEN:-}
+      BOUNCER_LOG_LEVEL: ${BOUNCER_LOG_LEVEL:-INFO}
+      # Agent keys: read from ./.env when present (make setup), otherwise the dev keys from .env.example.
+      BOUNCER_KEY_OPS_COPILOT: ${BOUNCER_KEY_OPS_COPILOT:-bk_dev_ops_copilot}
+      BOUNCER_KEY_DEV_ASSISTANT: ${BOUNCER_KEY_DEV_ASSISTANT:-bk_dev_dev_assistant}
+      BOUNCER_KEY_INTERN_BOT: ${BOUNCER_KEY_INTERN_BOT:-bk_dev_intern_bot}
+      BOUNCER_KEY_PLAYGROUND: ${BOUNCER_KEY_PLAYGROUND:-bk_dev_playground}
+    ports:
+      - "127.0.0.1:${BOUNCER_HOST_PORT:-8700}:8700"
+    volumes:
+      - ./policy:/app/policy:ro
+      - ./signatures:/app/signatures:ro
+      - ./models:/app/models:ro
+      - bouncer-data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mock:
+        condition: service_healthy
+      mcp:
+        condition: service_started
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "docker/healthcheck.py", "http://127.0.0.1:8700/healthz"]
+
+  mock:
+    <<: *app
+    command: ["uvicorn", "demo.mock_upstream:app", "--host", "0.0.0.0", "--port", "8702", "--log-level", "warning"]
+    ports:
+      - "127.0.0.1:${MOCK_HOST_PORT:-8702}:8702"
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "docker/healthcheck.py", "http://127.0.0.1:8702/v1/models"]
+
+  mcp:
+    <<: *app
+    command: ["python", "docker/run_mcp.py"]
+    environment:
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8703"
+      DEMO_MCP_FLAG: /app/data/mcp_poison.flag
+    ports:
+      - "127.0.0.1:${MCP_HOST_PORT:-8703}:8703"
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "docker/healthcheck.py", "http://127.0.0.1:8703/health"]
+
+  feed:
+    <<: *app
+    command: ["python", "scripts/feed_server.py", "--host", "0.0.0.0", "--port", "8704"]
+    ports:
+      - "127.0.0.1:${FEED_HOST_PORT:-8704}:8704"
+    volumes:
+      - ./signatures:/app/signatures:ro
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "docker/healthcheck.py", "http://127.0.0.1:8704/feed.pub"]
+
+  tests:
+    image: bouncer:test
+    build:
+      context: .
+      target: test
+    profiles: [tests]
+    # Offline by design: proves `make test` needs no network and no models.
+    network_mode: none
+    # root only so the report can be written into the bind mount on Linux hosts as well.
+    user: "0:0"
+    volumes:
+      - ${BOUNCER_TEST_REPORTS:-./reports/tests}:/app/reports/tests
+
+  judge:
+    <<: *app
+    profiles: [cpu-judge]
+    command: ["python", "-m", "judge.server"]
+    environment:
+      JUDGE_HOST: 0.0.0.0
+      JUDGE_PORT: "8701"
+      JUDGE_BACKEND: ollama-guard
+      OLLAMA_URL: ${BOUNCER_DOCKER_OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_GUARD_MODEL: ${OLLAMA_GUARD_MODEL:-llama-guard3:1b}
+    ports:
+      - "127.0.0.1:${JUDGE_HOST_PORT:-8701}:8701"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "docker/healthcheck.py", "http://127.0.0.1:8701/health"]
+
+  redis:
+    image: redis:7-alpine
+    profiles: [redis]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6390}:6379"
+    healthcheck:
+      <<: *health
+      test: ["CMD", "redis-cli", "ping"]
+
+volumes:
+  bouncer-data:

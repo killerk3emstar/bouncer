@@ -46,6 +46,8 @@ def _area(nodeid: str) -> str:
 def pytest_sessionfinish(session, exitstatus):  # noqa: ANN001, ANN201
     if not _results:
         return
+    markexpr = (session.config.getoption("-m") or "").strip()
+    suffix = "_live" if markexpr == "live" else ""
     out = ROOT / "reports" / "tests"
     out.mkdir(parents=True, exist_ok=True)
     by = defaultdict(lambda: {"passed": 0, "failed": 0, "skipped": 0, "allow_cases": 0, "block_cases": 0})
@@ -67,7 +69,7 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: ANN001, ANN201
         "failed": sum(1 for r in _results if r["outcome"] == "failed"),
         "by_control": dict(sorted(by.items())),
     }
-    (out / "summary.json").write_text(json.dumps(summary, indent=2))
+    (out / f"summary{suffix}.json").write_text(json.dumps(summary, indent=2))
     lines = [
         "# Test summary",
         "",
@@ -78,4 +80,4 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: ANN001, ANN201
     ]
     for name, b in summary["by_control"].items():
         lines.append(f"| {name} | {b['passed']} | {b['failed']} | {b['allow_cases']} | {b['block_cases']} |")
-    (out / "summary.md").write_text("\n".join(lines) + "\n")
+    (out / f"summary{suffix}.md").write_text("\n".join(lines) + "\n")

@@ -252,6 +252,7 @@ def test_clef_sanitize_breaks_chat_template_tokens():
 
 
 def test_clef_fit_state_cuts_untrusted_content_not_user_request():
+    pytest.importorskip("mlx")  # Apple Silicon only; Linux containers skip it
     from judge.backends.clef_mlx import ClefMLXBackend
 
     b = ClefMLXBackend(path="/nonexistent")

@@ -204,6 +204,8 @@ class OnnxInjectionClassifier:
                 )
             opts = ort.SessionOptions()
             opts.intra_op_num_threads = self.threads
+            # no busy-waiting between calls: measured 40.8 -> 22.5 ms CPU per call for +1.3 ms latency
+            opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
             opts.inter_op_num_threads = 1
             opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             self._session = ort.InferenceSession(str(model_file), opts, providers=["CPUExecutionProvider"])
