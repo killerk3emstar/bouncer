@@ -13,7 +13,7 @@ client = OpenAI(base_url="http://localhost:8700/v1", api_key="<your Bouncer agen
 
 ```bash
 make setup     # uv sync (Python 3.12), creates .env from .env.example
-make test      # offline test suite: no network, no models, about 7 s
+make test      # offline test suite: 1062 tests, no network, no models, about 10 s
 make dev       # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704
 ```
 
@@ -98,9 +98,10 @@ Everything above is configured in one file, [`policy/bouncer.yaml`](policy/bounc
 ## Self-testing
 
 ```bash
-make test        # pytest, offline, about 7 s; JUnit + HTML report and a per-control table in reports/tests/
+make test        # pytest, offline, about 10 s; JUnit + HTML report and a per-control table in reports/tests/
 make test-live   # the same cases against the running stack with the real T1 and T2
-make eval        # detection quality per layer on public and our own datasets: reports/eval.md
+make eval        # detection quality of T0 and T1 (no judge needed): reports/eval_quick.md
+make eval-full   # T0, T1 and the full pipeline with the judge: reports/eval_layers.md
 make bench       # gateway latency overhead and throughput: reports/bench.md
 ```
 
@@ -130,11 +131,25 @@ The same suite runs from the dashboard ("Run self-test" in Playground).
 
 ## Measured numbers
 
-All on an Apple M4 Pro (48 GB), shared with other work during the measurements.
+All on an Apple M4 Pro (48 GB), shared with other work during the measurements. Reports are in [`reports/`](reports/).
 
-- Tests: `make test` runs 685 tests (YAML cases and unit tests) in about 7 s.
-- T2 judge (Clef-flash MLX 4-bit) on 102 hand-labeled cases (EN, PL): injection AUC 0.996, goal alignment 0.978, exfiltration 0.974; no false positive on 33 benign tool results containing imperative text. Llama Guard 3 1B on the same set: 0.72 / 0.58 / 0.74. Details: [reports/judge_go_no_go.md](reports/judge_go_no_go.md).
-- T1 classifier: precise on classic direct injections, but on our business-text set it flagged 26% of benign prompts at a 0.5 threshold, and it is at chance on indirect injections in tool results (AUC 0.48). That is why T1 only routes text to the judge and never blocks on its own in the default profile. Details: [reports/t1.md](reports/t1.md), [reports/eval.md](reports/eval.md).
+**Detection** (`make eval-full`, 394 texts: our bank-operations set of 278 EN/PL/DE prompts and `deepset/prompt-injections` test split; [reports/eval_layers.md](reports/eval_layers.md)):
+
+| Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
+|---|---|---|---|---|
+| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.4 / 0.8 ms |
+| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 10.8 / 21.2 ms |
+| Full pipeline (T0 + T1 + T2 judge) | 98.4% | 64.4% | 1.0% | 13.6 / 674 ms |
+
+On the bank-operations set alone the pipeline catches 117 of 134 attacks (87%) with 2 false positives in 144 benign prompts. On `deepset/prompt-injections` it catches 8 of 60: most of those items are role-play or topic-change requests ("act as a storyteller") that our judge questions do not treat as an attack on a bank assistant. T1 alone flags too many business prompts, so in the default profile it only routes text to the judge.
+
+**Red team** (82 attacks across 22 techniques, 46 hard benign prompts, through the real pipeline with the real T1; [reports/redteam.md](reports/redteam.md)): 82/82 attacks stopped, 46/46 benign prompts allowed.
+
+**T2 judge** (Clef-flash MLX 4-bit) on 102 hand-labeled cases (EN, PL): injection AUC 0.996, goal alignment 0.978, exfiltration 0.974, no false positive on 33 benign tool results with imperative text; 1.1 to 2.0 s per decision for states up to about 300 tokens. Llama Guard 3 1B on the same set: 0.72 / 0.58 / 0.74. [reports/judge_go_no_go.md](reports/judge_go_no_go.md).
+
+**Overhead** (`make bench`, simulated model, 200 requests per scenario; [reports/bench.md](reports/bench.md)): gateway overhead p50 8.7 ms for a short prompt and 86 ms for a 2 KB prompt, of which T1 is 86 to 96%; 0.2 ms for a repeated prompt (cached). Throughput of one worker: about 100 req/s with T1, about 620 req/s without it. MCP gateway: 7.7 ms overhead p50 per tool call.
+
+**Tests**: `make test` runs 1062 tests (427 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
 
 ## Architecture
 
