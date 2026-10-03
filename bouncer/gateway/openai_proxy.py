@@ -112,7 +112,7 @@ def authenticate(g: GatewayState, request: Request) -> Principal | None:
 def unauthorized(g: GatewayState, route: str) -> JSONResponse:
     ev = g.audit.write(
         {
-            "kind": "decision",
+            "type": "decision",
             "trace_id": "tr_unauth_" + hashlib.sha256(str(time.time()).encode()).hexdigest()[:8],
             "principal": {"id": "anonymous", "team": None},
             "route": route,
@@ -235,7 +235,7 @@ def upstream_error(g: GatewayState, ctx: RequestCtx, detail: str, input_action: 
     f = ctx_finding(g, "gateway", "upstream_error", f"Upstream model call failed: {detail}. Check that the upstream for {ctx.model} is running.", "low", Action.LOG)
     f.effective_action = Action.LOG
     ctx.findings.append(f)
-    g.engine.finish(ctx, input_action, direction="input", extra={"upstream_error": detail[:300]})
+    g.engine.finish(ctx, input_action, direction="input", extra={"upstream_error": detail[:300]}, status_code=502, message=f"Upstream model call failed: {detail[:200]}")
     return JSONResponse(
         error_body("gateway.upstream_error", f"Upstream model call failed: {detail}", ctx.trace_id, etype="upstream_error"),
         status_code=502 if status < 500 else status,

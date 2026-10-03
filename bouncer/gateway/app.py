@@ -42,7 +42,7 @@ def build_state(
         telemetry.policy_reloads.labels("ok" if kind == "policy.reloaded" else "failed").inc()
         audit = holder.get("audit")
         if audit is not None:
-            audit.write({"kind": kind, "trace_id": None, "route": "policy", **data})
+            audit.write({"type": kind, "trace_id": None, "route": "policy", **data})
 
     policies = PolicyManager(settings.policy_path, shared=shared, on_event=on_policy_event)
     policy = policies.load_initial()

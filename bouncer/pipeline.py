@@ -68,6 +68,8 @@ class RequestCtx:
     direction: str = "input"
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    status_code: int | None = None
+    message: str | None = None
 
     @property
     def doc(self):  # noqa: ANN201
@@ -833,6 +835,8 @@ class Engine:
         if approval_id:
             msg = f"{msg} Approval id {approval_id}."
         ctx.approval_id = approval_id or ctx.approval_id
+        ctx.status_code = status
+        ctx.message = msg
         return Decision(action=action, findings=findings, status=status, code=top.id if top else None, message=msg, approval_id=approval_id)
 
     def _create_approval(self, ctx: RequestCtx, findings: list[Finding], phase: str) -> str | None:
@@ -907,21 +911,33 @@ class Engine:
         usage: dict[str, Any] | None = None,
         direction: str | None = None,
         extra: dict[str, Any] | None = None,
+        status_code: int | None = None,
+        message: str | None = None,
     ) -> dict[str, Any]:
         total = _now_ms() - ctx.started_ms
+        if status_code is None:
+            status_code = ctx.status_code or (200 if action < Action.REQUIRE_APPROVAL else 403)
+        if message is None:
+            message = ctx.message
         lat = {k: round(v, 3) for k, v in ctx.latency.items()}
         lat["gateway_overhead"] = round(max(total - ctx.latency.get("upstream", 0.0), 0.0), 3)
         lat["total"] = round(total, 3)
         findings = ctx.findings
+        mcfg = ctx.doc.models.get(ctx.model or "")
         event = {
-            "kind": "decision",
+            "type": "decision",
             "trace_id": ctx.trace_id,
             "principal": ctx.principal.to_dict(),
             "session_id": ctx.session_id,
             "route": ctx.route,
             "direction": direction or ctx.direction,
             "model": ctx.model,
+            "upstream": mcfg.upstream if mcfg else None,
             "action": action.label,
+            "enforced": not any(f.monitor for f in findings) or action >= Action.REQUIRE_APPROVAL,
+            "status_code": status_code,
+            "tool": ctx.tool_calls[0]["tool"] if ctx.tool_calls else None,
+            "message": message,
             "findings": [f.to_dict() for f in findings],
             "judge": ctx.judge or {"invoked": False},
             "t1": ctx.t1_scores,

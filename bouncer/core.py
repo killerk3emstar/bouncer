@@ -136,6 +136,7 @@ class Finding:
             "effective_action": (self.effective_action or self.action).label,
             "monitor": self.monitor,
             "message": self.message,
+            "reason": self.message,
             "direction": self.direction,
             "source": self.source,
             "span": list(self.span) if self.span else None,

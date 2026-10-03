@@ -131,7 +131,7 @@ class AuditLog:
         out = []
         ql = q.lower() if q else None
         for ev in reversed(self.events):
-            if kind and ev.get("kind", "decision") != kind:
+            if kind and ev.get("type", "decision") != kind:
                 continue
             if before_seq is not None and ev.get("seq", 0) >= before_seq:
                 continue
