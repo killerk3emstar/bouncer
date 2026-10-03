@@ -217,9 +217,8 @@ def test_malformed_requests_get_400_not_500(env, body) -> None:  # noqa: ANN001
 
 def test_ai_layers_only_see_redacted_text(tmp_path: Path) -> None:
     """T1 and the judge must never receive a secret, even when a prompt is escalated."""
-    from judge.backends.fake import FakeBackend
-
     from bouncer.t1.fake import FakeInjectionClassifier
+    from judge.backends.fake import FakeBackend
 
     os.environ["BOUNCER_KEY_DEV_ASSISTANT"] = "bk_test_dev"
     secret = "AKIAIOSFODNN7EXAMPLE"
