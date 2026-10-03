@@ -70,6 +70,7 @@ class RequestCtx:
     notes: list[str] = field(default_factory=list)
     status_code: int | None = None
     message: str | None = None
+    input_key: str | None = None
 
     @property
     def doc(self):  # noqa: ANN201
@@ -414,10 +415,11 @@ class Engine:
         elif pi is not None:
             ctx.notes.append("semantic layers skipped: a deterministic control already blocks this request")
 
-        # an approved identical input passes its require_approval findings
-        ctx.excerpt = _excerpt(body, doc.audit.excerpt_chars)
+        # an approved identical input passes its require_approval findings; the key is a hash of the raw
+        # text and is never stored as text (the audit excerpt is taken after redaction, below)
+        ctx.input_key = call_hash("input", _excerpt(body, doc.audit.excerpt_chars))
         if any(f.action == Action.REQUIRE_APPROVAL for f in findings):
-            appr = self.store.approved(ctx.principal.id, call_hash("input", ctx.excerpt))
+            appr = self.store.approved(ctx.principal.id, ctx.input_key)
             if appr is not None:
                 for f in findings:
                     if f.action == Action.REQUIRE_APPROVAL:
@@ -434,6 +436,7 @@ class Engine:
             if f.effective_action == Action.REDACT and f.span is None and f.control in REDACTION_CONTROLS and f.view != "raw":
                 pass  # decoded-view findings carry the blob span; normalized-view ones are emitted as block by controls
         ctx.findings.extend(findings)
+        ctx.excerpt = _safe_excerpt(body, cleaned, doc.audit.excerpt_chars)
         return self._decision(ctx, findings, action, phase="input")
 
     def _judge_enabled(self, ctx: RequestCtx) -> bool:
@@ -986,7 +989,7 @@ class Engine:
                 call = rec
                 break
         if call is None:
-            h = call_hash("input", ctx.excerpt)
+            h = ctx.input_key or call_hash("input", ctx.excerpt)
             tool, args = "(prompt)", ctx.excerpt[:200]
         else:
             h, tool, args = call["call_hash"], call["tool"], json.dumps(call["arguments"], ensure_ascii=False)[:500]
@@ -1165,6 +1168,28 @@ def _top_finding(findings: list[Finding]) -> Finding | None:
         if best is None or key > best[0]:
             best = (key, f)
     return best[1] if best else None
+
+
+def _safe_excerpt(body: dict[str, Any], cleaned: list[tuple[Segment, str, list[Finding]]], n: int) -> str:
+    """Audit excerpt with every secret and PII value masked, whatever the action was (a blocked secret is not
+    redacted in the request, but it must never reach the audit log). A segment where a secret was found only
+    in a normalized or decoded form (no exact position) is withheld entirely."""
+    import copy
+
+    shadow = copy.deepcopy(body)
+    for seg, clean, segf in cleaned:
+        if seg.direction == "tool_definition":
+            continue
+        sensitive = [f for f in segf if f.control in REDACTION_CONTROLS]
+        if any(f.span is None for f in sensitive):
+            text = f"[withheld: {', '.join(sorted({f.id for f in sensitive if f.span is None}))} found in an encoded or normalized form]"
+        else:
+            text = apply_redactions(clean, sensitive)
+        try:
+            set_in(shadow, seg.location, text)
+        except (KeyError, IndexError, TypeError):
+            continue
+    return _excerpt(shadow, n)
 
 
 def _excerpt(body: dict[str, Any], n: int) -> str:

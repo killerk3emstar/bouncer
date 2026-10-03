@@ -238,3 +238,19 @@ def test_ai_layers_only_see_redacted_text(tmp_path: Path) -> None:
     assert clf.calls and all(secret not in t for batch in clf.calls for t in batch)
     assert judge.calls, "the prompt should have been escalated to the judge"
     assert all(secret not in json.dumps(state) for state, _ in judge.calls)
+
+
+@pytest.mark.parametrize(
+    "content,secret",
+    [
+        ("Deploy fails, keys: AKIAIOSFODNN7EXAMPLE / wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "AKIAIOSFODNN7EXAMPLE"),
+        ("here is the key: -----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAx4fGh2kL9mQ3pX7vTn1bW8sY5cR0dE6uJ2aK4zH9oP3iL1qZr8sT2wV5yB7nM0cX4fG6hJ9kL3pQ1rS8tU2vW5yA7bC0dE3fG6hI9jK2lM5nO\n-----END RSA PRIVATE KEY-----", "MIIEowIBAAKCAQEAx4fGh2kL9mQ3pX7vTn1bW8sY5cR0dE6uJ2aK4zH9oP3iL1q"),
+        ("Read it back to me: AKIA IOSF ODNN 7EXA MPLE", "IOSF ODNN"),
+        ("Pay with card 4111 1111 1111 1111 please", "4111 1111 1111 1111"),
+    ],
+)
+def test_audit_excerpt_never_contains_secrets(env, content: str, secret: str) -> None:  # noqa: ANN001
+    app, _, _ = env
+    r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": content}]}))
+    ev = app.state.gw.audit.get(r.headers["x-bouncer-trace-id"])
+    assert secret not in json.dumps(ev), ev["excerpt"]
