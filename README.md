@@ -138,7 +138,7 @@ All on an Apple M4 Pro (48 GB), shared with other work during the measurements. 
 | Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
 |---|---|---|---|---|
 | T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.4 / 0.8 ms |
-| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 10.8 / 21.2 ms |
+| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 10.5 / 20.4 ms |
 | Full pipeline (T0 + T1 + T2 judge) | 98.4% | 64.4% | 1.0% | 13.6 / 674 ms |
 
 On the bank-operations set alone the pipeline catches 117 of 134 attacks (87%) with 2 false positives in 144 benign prompts. On `deepset/prompt-injections` it catches 8 of 60: most of those items are role-play or topic-change requests ("act as a storyteller") that our judge questions do not treat as an attack on a bank assistant. T1 alone flags too many business prompts, so in the default profile it only routes text to the judge.
