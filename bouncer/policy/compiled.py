@@ -28,6 +28,7 @@ TEXT_CONTROLS: list[tuple[str, str, str]] = [
     ("prompt_injection", "bouncer.controls.injection_heuristics", "InjectionHeuristicsControl"),
     ("signatures", "bouncer.controls.signatures", "SignaturesControl"),
     ("output_safety", "bouncer.controls.output_safety", "OutputSafetyControl"),
+    ("supply_chain", "bouncer.controls.supply_chain", "SupplyChainControl"),
 ]
 
 # Every control the gateway knows about, for the dashboard and coverage (id -> OWASP mapping).

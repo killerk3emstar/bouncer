@@ -122,7 +122,7 @@ DESCRIPTIONS = {
 }
 
 # Controls whose enforcement code exists in this build (others show as "not implemented").
-IMPLEMENTED = {"auth", "secrets", "pii", "obfuscation", "prompt_injection", "tool_governance", "budgets", "loops", "output_safety", "signatures", "approvals"}
+IMPLEMENTED = {"auth", "secrets", "pii", "obfuscation", "prompt_injection", "tool_governance", "budgets", "loops", "output_safety", "signatures", "approvals", "supply_chain"}
 
 
 def _iso(ts: float | None) -> str | None:
