@@ -1,0 +1,58 @@
+# PII and external model providers (OWASP LLM02). Clearance lets ops-copilot see customer data,
+# but the data must not reach a non-local model provider (pii.external_models: enforce).
+
+- id: pii-external-redact-tool-result-for-cleared-agent
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: ops-copilot
+  request:
+    model: gpt-4o-mini
+    messages:
+      - {role: user, content: "Look up customer C-10007."}
+      - {role: assistant, content: null, tool_calls: [{id: c1, type: function, function: {name: crm__lookup_customer, arguments: "{\"query\": \"C-10007\"}"}}]}
+      - {role: tool, tool_call_id: c1, content: "C-10007 Anna Nowak, e-mail anna.nowak@mailbox.example, IBAN PL61109010140000071219812874"}
+  expect:
+    action: redact
+    findings: [pii.EMAIL, pii.IBAN]
+    upstream_must_not_contain: ["anna.nowak@mailbox.example", "PL61109010140000071219812874"]
+
+- id: pii-local-model-cleared-agent-sees-pii
+  control: pii
+  kind: log
+  owasp_llm: [LLM02]
+  principal: ops-copilot
+  request:
+    model: "qwen3:8b"
+    messages:
+      - {role: user, content: "Look up customer C-10007."}
+      - {role: assistant, content: null, tool_calls: [{id: c1, type: function, function: {name: crm__lookup_customer, arguments: "{\"query\": \"C-10007\"}"}}]}
+      - {role: tool, tool_call_id: c1, content: "C-10007 Anna Nowak, e-mail anna.nowak@mailbox.example"}
+  expect:
+    action: log
+    findings: [pii.EMAIL]
+    upstream_must_contain: ["anna.nowak@mailbox.example"]
+
+- id: pii-external-setting-off-uses-clearance
+  control: pii
+  kind: log
+  owasp_llm: [LLM02]
+  principal: ops-copilot
+  policy_patch: {controls: {pii: {external_models: "off"}}}
+  request:
+    model: gpt-4o-mini
+    messages:
+      - {role: user, content: "Look up customer C-10007."}
+      - {role: assistant, content: null, tool_calls: [{id: c1, type: function, function: {name: crm__lookup_customer, arguments: "{\"query\": \"C-10007\"}"}}]}
+      - {role: tool, tool_call_id: c1, content: "C-10007 Anna Nowak, e-mail anna.nowak@mailbox.example"}
+  expect:
+    action: log
+    upstream_must_contain: ["anna.nowak@mailbox.example"]
+
+- id: pii-external-uncleared-agent-redacted
+  control: pii
+  kind: redact
+  owasp_llm: [LLM02]
+  principal: playground
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a note to anna.nowak@mailbox.example about her card."}]}
+  expect: {action: redact, findings: [pii.EMAIL], upstream_must_not_contain: ["anna.nowak@mailbox.example"]}

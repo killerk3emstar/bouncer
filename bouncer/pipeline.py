@@ -376,6 +376,8 @@ class Engine:
             cleaned.append((seg, clean, seg_findings))
             findings.extend(seg_findings)
 
+        self._enforce_pii_for_external_model(ctx, findings)
+
         # session taint from the history (stateless) and from the store
         for name in history_tool_results(body, known):
             if name in untrusted_tools:
@@ -411,6 +413,27 @@ class Engine:
                 pass  # decoded-view findings carry the blob span; normalized-view ones are emitted as block by controls
         ctx.findings.extend(findings)
         return self._decision(ctx, findings, action, phase="input")
+
+    def _enforce_pii_for_external_model(self, ctx: RequestCtx, findings: list[Finding]) -> None:
+        """Clearance lets a principal see PII, but PII still must not reach an external model provider."""
+        pii = ctx.doc.controls.pii
+        if pii is None or pii.external_models != "enforce" or not ctx.model:
+            return
+        mcfg = ctx.doc.models.get(ctx.model)
+        up = ctx.doc.upstreams.get(mcfg.upstream) if mcfg else None
+        if up is None or up.local:
+            return
+        for f in findings:
+            if f.control != "pii" or f.direction not in ("input", "tool_result") or f.span is None:
+                continue
+            configured = Action.parse(pii.entities.get(f.rule, "log"))
+            if configured >= Action.REDACT and f.action < configured:
+                f.action = configured
+                f.message = (
+                    f"{f.rule} redacted before it reached {ctx.model}: the model provider is external "
+                    f"(upstream {mcfg.upstream}), so the clearance of {ctx.principal.id} does not apply "
+                    "(pii.external_models). Use a local model for work that needs customer identifiers."
+                )
 
     async def _semantic_injection(
         self, ctx: RequestCtx, cleaned: list[tuple[Segment, str, list[Finding]]], pi: Any

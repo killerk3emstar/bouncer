@@ -120,6 +120,9 @@ class PiiCfg(ControlCfg):
     directions: list[DirectionName] = ["input", "output", "tool_result"]
     entities: dict[PiiEntity, ActionName] = {}
     output_visible_for_clearance: list[ClearanceName] = []
+    # PII sent to a model whose upstream is not local: entities configured as redact (or stronger)
+    # are enforced even for cleared principals. off = clearance applies to every upstream.
+    external_models: Literal["enforce", "off"] = "enforce"
 
 
 class ObfuscationCfg(ControlCfg):
