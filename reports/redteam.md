@@ -22,7 +22,7 @@ Probe set: `scripts/redteam/probes.py` (82 attacks, 46 hard negatives). Harness:
 `scripts/redteam/harness.py`. All secrets/PII in the probes are synthetic EXAMPLE values (the same
 fixtures the unit tests use).
 
-## Re-run after fixes (2026-10-04 01:35)
+## Re-run after fixes (2026-10-04 00:45)
 
 All four gaps above were fixed in the controls and the policy (internal e-mail domains in `pii.internal_domains`;
 phone numbers need phone context; per-character homoglyph folding; separator-free and near-miss matching for the
