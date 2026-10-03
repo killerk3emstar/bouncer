@@ -439,6 +439,35 @@ class Engine:
         ctx.excerpt = _safe_excerpt(body, cleaned, doc.audit.excerpt_chars)
         return self._decision(ctx, findings, action, phase="input")
 
+    def audit_mask(self, ctx: RequestCtx, text: str, direction: str = "tool_call") -> str:
+        """Text for the audit log, approvals and the judge: every secret and PII value masked, whatever the
+        policy's enforcement directions and actions are. If a value was found only in a normalized or decoded
+        form (no exact position), the text is withheld."""
+        if not text:
+            return text
+        seg = Segment(text, direction, "audit", False, ())  # type: ignore[arg-type]
+        clean, views, _ = self.normalize(seg, ctx.doc.controls.obfuscation if _enabled(ctx.doc.controls.obfuscation) else None)
+        seg = Segment(clean, direction, "audit", False, ())  # type: ignore[arg-type]
+        found: list[Finding] = []
+        for cid in REDACTION_CONTROLS:
+            control = ctx.variant.controls.get(cid)
+            if control is None:
+                continue
+            try:
+                found.extend(control.scan(seg, views, ctx.scan))
+            except Exception:  # masking must never fail open into the log
+                log.exception("audit masking with %s failed", cid)
+                return "[withheld: masking failed]"
+        if any(f.span is None for f in found):
+            return f"[withheld: {', '.join(sorted({f.id for f in found if f.span is None}))} found in an encoded or normalized form]"
+        return apply_redactions(clean, found)
+
+    def _masked_args(self, ctx: RequestCtx, args_text: str) -> Any:
+        masked = self.audit_mask(ctx, args_text or "")
+        if masked.startswith("[withheld"):
+            return masked
+        return _mask_args(parse_args(masked))
+
     def _judge_enabled(self, ctx: RequestCtx) -> bool:
         """The judge is off when the policy says backend: none or the gateway overrides it to none."""
         if self.judge is None:
@@ -583,7 +612,7 @@ class Engine:
                 state = {"USER_MESSAGE": _clip(clean, 2000)}
             else:
                 qid = "injection"
-                state = {"USER_REQUEST": _clip(ctx.user_request, 600), "UNTRUSTED_CONTENT": _clip(clean, 2000)}
+                state = {"USER_REQUEST": _clip(self.audit_mask(ctx, ctx.user_request, "input"), 600), "UNTRUSTED_CONTENT": _clip(clean, 2000)}
             res = await self._judge_call(ctx, state, {qid: questions[qid].model_dump(exclude_none=True)}, reason)
             if res is None:
                 continue
@@ -706,7 +735,7 @@ class Engine:
                     )
                 )
             h = call_hash(name, args)
-            record = {"tool": name, "wire_name": wire, "call_hash": h, "arguments": _mask_args(args)}
+            record = {"tool": name, "wire_name": wire, "call_hash": h, "arguments": self._masked_args(ctx, args_text or "")}
             if tg is not None and name in tg.memory_write_tools:
                 call_findings.extend(await self._scan_memory_write(ctx, name, args_text or "", loc))
             if tg is not None:
@@ -752,11 +781,6 @@ class Engine:
             red = [f for f in seg_findings if f.action == Action.REDACT and f.span is not None]
             if red:
                 fn["arguments"] = apply_redactions(clean, red)
-                record["arguments"] = _mask_args(parse_args(fn["arguments"]))
-            elif any(f.control in REDACTION_CONTROLS for f in seg_findings):
-                # a secret or PII value that is blocked or logged (not redacted) must still not reach the audit log
-                spans = [f for f in seg_findings if f.control in REDACTION_CONTROLS and f.span is not None]
-                record["arguments"] = _mask_args(parse_args(apply_redactions(clean, spans)))
             tc["_bouncer"] = {"tool": name, "call_hash": h, "findings": call_findings}
             findings.extend(call_findings)
         return findings
@@ -889,9 +913,10 @@ class Engine:
             return []
         ctx.escalated = True
         untrusted = self._recent_untrusted(ctx)
+        masked_args = self._masked_args(ctx, json.dumps(args, ensure_ascii=False) if not isinstance(args, str) else args)
         state = {
-            "USER_REQUEST": _clip(ctx.user_request, 600),
-            "PROPOSED_ACTION": _clip(f"{name}({json.dumps(_mask_args(args), ensure_ascii=False)})", 1200),
+            "USER_REQUEST": _clip(self.audit_mask(ctx, ctx.user_request, "input"), 600),
+            "PROPOSED_ACTION": _clip(f"{name}({json.dumps(masked_args, ensure_ascii=False)})", 1200),
         }
         if untrusted:
             state["UNTRUSTED_CONTENT"] = _clip(untrusted, 1200)

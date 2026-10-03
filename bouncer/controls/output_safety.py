@@ -293,7 +293,7 @@ class OutputSafetyControl(Control):
             action=action,
             message=f"{what} {verdict}. {why}{advice}",
             span=span,
-            evidence=_short(url, 80),
+            evidence=_short(_mask_query(url), 80),
             owasp_llm=["LLM05", "LLM02"],
             owasp_agentic=[],
             atlas=list(ATLAS_EXFIL),
@@ -318,7 +318,7 @@ class OutputSafetyControl(Control):
                 "remote content in the client (insecure output handling); render model output as text or escape it."
             ),
             span=span,
-            evidence=_short(element, 80),
+            evidence=_short(_mask_query(element), 80),
             owasp_llm=["LLM05"],
             owasp_agentic=[],
             atlas=[],
@@ -370,6 +370,12 @@ class OutputSafetyControl(Control):
             atlas=list(ATLAS_CANARY),
             view=view,
         )
+
+
+def _mask_query(text: str) -> str:
+    """Evidence must not carry the data an exfiltration URL smuggles: keep scheme, host and path, mask the
+    query string and fragment."""
+    return re.sub(r"([?#])[^\s\"'<>)]*", r"\1[masked]", text)
 
 
 def _short(s: str, n: int) -> str:

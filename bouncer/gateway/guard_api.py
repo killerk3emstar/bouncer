@@ -75,7 +75,7 @@ async def run_guard(g: Any, principal: Any, payload: GuardRequest, route: str = 
                 if tg is not None and tool in tg.sensitive_source_tools:
                     g.store.mark_taint(sid, "sensitive", tool)
         findings.extend(seg_findings)
-        ctx.excerpt = clean[: ctx.doc.audit.excerpt_chars]
+        ctx.excerpt = g.engine.audit_mask(ctx, clean, payload.direction)[: ctx.doc.audit.excerpt_chars]
         ctx.direction = payload.direction
     if payload.tool_call is not None:
         args = payload.tool_call.arguments
@@ -84,7 +84,8 @@ async def run_guard(g: Any, principal: Any, payload: GuardRequest, route: str = 
         findings.extend(await g.engine.inspect_tool_calls(ctx, body, [tc], ("tool_call",)))
         ctx.direction = "tool_call"
         if not ctx.excerpt:
-            ctx.excerpt = f"{payload.tool_call.name}({tc['function']['arguments'][:200]})"
+            masked = ctx.tool_calls[-1]["arguments"] if ctx.tool_calls else ""
+            ctx.excerpt = f"{payload.tool_call.name}({json.dumps(masked, ensure_ascii=False)[:200]})"
     action = g.engine.finalize(ctx, findings)
     ctx.findings.extend(findings)
     decision = g.engine._decision(ctx, findings, action, "input")
