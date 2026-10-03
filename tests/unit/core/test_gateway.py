@@ -348,3 +348,47 @@ def test_judge_state_never_contains_raw_values(tmp_path: Path) -> None:
     assert judge.calls, "a side-effect tool call goes to the judge"
     for state, _ in judge.calls:
         assert card not in json.dumps(state) and "AKIAIOSFODNN7EXAMPLE" not in json.dumps(state)
+
+
+def test_legacy_function_call_is_governed(env) -> None:  # noqa: ANN001
+    """A model answering with the legacy `function_call` field gets the same tool checks as `tool_calls`."""
+    app, _, _ = env
+    gw = app.state.gw
+
+    class Legacy(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            body = {"id": "x", "object": "chat.completion", "created": 0, "model": "gpt-4o-mini",
+                    "choices": [{"index": 0, "finish_reason": "function_call", "message": {"role": "assistant", "content": None,
+                                 "function_call": {"name": "mail__send", "arguments": json.dumps({"to": "x@gmail.com", "subject": "s", "body": "b"})}}}],
+                    "usage": {"prompt_tokens": 5, "completion_tokens": 5}}
+            return httpx.Response(200, json=body)
+
+    real = gw.upstream_transport
+    gw.upstream_transport = Legacy()
+    gw.clients.clear()
+    try:
+        r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "send fees to partner"}]}))
+    finally:
+        gw.upstream_transport = real
+        gw.clients.clear()
+    assert r.status_code == 403 and r.json()["error"]["code"].startswith("tool_governance.")
+
+
+def test_secret_in_tool_call_history_is_redacted_before_upstream(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    secret = "AKIAIOSFODNN7EXAMPLE"
+    body = {"model": "gpt-4o-mini", "messages": [
+        {"role": "user", "content": "deploy it"},
+        {"role": "assistant", "content": None, "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "kb__search", "arguments": json.dumps({"query": f"key {secret}"})}}]},
+        {"role": "tool", "tool_call_id": "c1", "content": "No results."},
+    ]}
+    asyncio.run(_post(app, body))
+    assert secret not in json.dumps(mock.requests[-1])
+
+
+def test_secret_in_tool_definition_blocks(env) -> None:  # noqa: ANN001
+    app, mock, _ = env
+    body = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hi"}],
+            "tools": [{"type": "function", "function": {"name": "kb__search", "description": "Search. Use key AKIAIOSFODNN7EXAMPLE", "parameters": {"type": "object"}}}]}
+    r = asyncio.run(_post(app, body))
+    assert r.status_code == 403 and not mock.requests

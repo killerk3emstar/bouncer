@@ -111,8 +111,8 @@ budgets:
 controls:
 
   secrets:                         # OWASP LLM02
-    directions: [input, output, tool_call, tool_result]
-    action: redact                 # replaced with [REDACTED:<rule>#n] before it reaches the model
+    directions: [input, output, tool_call, tool_result, tool_definition]
+    action: redact                 # replaced with [REDACTED:<rule>] before it reaches the model (tool definitions: block)
     rules: builtin                 # provider keys, tokens, private keys, JWTs, connection strings
     entropy: {enabled: true, min_length: 24, min_bits_per_char: 4.2}
     overrides:
@@ -128,7 +128,7 @@ controls:
       IBAN: redact                 # mod-97 validated
       CREDIT_CARD: block           # Luhn-validated
     output_visible_for_clearance: [confidential, restricted]   # these principals see PII in responses
-    external_models: enforce       # enforce | off: PII never reaches a non-local model provider, whatever the clearance
+    external_models: enforce       # enforce | off: entities set to redact or block never reach a non-local model provider, whatever the clearance
     internal_domains: [bank.example]   # e-mail addresses here are business contacts, not customer PII
 
   obfuscation:                     # OWASP LLM01
@@ -194,9 +194,9 @@ controls:
     require_safetensors: true
     mcp:
       servers_allow: [demo-bank]
-      pin_tool_definitions: true   # definition changes after first approval = blocked until re-approved
+      pin_tool_definitions: true   # the first clean definition is pinned; a changed one is hidden and blocked until a human approves it
 
-  # harmful_content:               # optional; answered in the same judge pass at no extra latency
+  # harmful_content:               # planned, not implemented in this build: enabling it shows the control but runs no check
   #   judge: {block_above: 0.80}
   #   categories: [cyberattack, fraud, violence, self_harm, hate]
 

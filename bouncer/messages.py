@@ -90,6 +90,20 @@ def extract_input_segments(
                 segments.append(
                     Segment(text, "tool_result", f"tool_result:{name}", name not in untrusted_tools, loc, tool=name)
                 )
+    # tool calls already made (history): their arguments go back to the model, so secrets in them are redacted
+    for i, m in enumerate(messages):
+        if isinstance(m, dict) and m.get("role") == "assistant":
+            for k, tc in enumerate(m.get("tool_calls") or []):
+                fn = (tc or {}).get("function") or {}
+                args = fn.get("arguments")
+                if isinstance(args, str) and args:
+                    name = resolve_tool_name(str(fn.get("name", "")), known_tools)
+                    segments.append(Segment(args, "tool_call", f"tool_call:{name}", True, ("messages", i, "tool_calls", k, "function", "arguments"), tool=name))
+    for j, f in enumerate(body.get("functions") or []):  # legacy functions API
+        if isinstance(f, dict):
+            name = resolve_tool_name(str(f.get("name", "")), known_tools)
+            text = f"{f.get('name', '')}\n{f.get('description', '') or ''}\n{json.dumps(f.get('parameters') or {}, ensure_ascii=False)}"
+            segments.append(Segment(text, "tool_definition", f"tool_definition:{name}", False, ("functions", j), tool=name))
     for j, t in enumerate(body.get("tools") or []):
         fn = (t or {}).get("function") or {}
         name = resolve_tool_name(str(fn.get("name", "")), known_tools)

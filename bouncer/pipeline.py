@@ -399,6 +399,11 @@ class Engine:
         cleaned: list[tuple[Segment, str, list[Finding]]] = []
         for seg in segments:
             clean, seg_findings, _views = self.scan_segment(ctx, seg)
+            if seg.direction == "tool_definition":
+                for f in seg_findings:
+                    if f.control in REDACTION_CONTROLS and f.action == Action.REDACT:
+                        f.action = Action.BLOCK
+                        f.message += " Tool definitions cannot be rewritten in place, so the request was blocked; remove the value from the tool description."
             cleaned.append((seg, clean, seg_findings))
             findings.extend(seg_findings)
 

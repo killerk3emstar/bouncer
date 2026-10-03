@@ -296,16 +296,26 @@ def upstream_error(g: GatewayState, ctx: RequestCtx, detail: str, input_action: 
     )
 
 
+# text fields of an assistant message that reach the agent; all are scanned like `content`
+TEXT_FIELDS = ("content", "reasoning_content", "reasoning", "refusal")
+
+
 async def finish_plain(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], out: dict[str, Any], input_action: Action) -> Any:
     findings: list[Finding] = []
-    content_cleans: dict[int, str] = {}
+    content_cleans: dict[tuple[int, str], str] = {}
     for i, choice in enumerate(out.get("choices") or []):
         msg = choice.get("message") or {}
-        content = msg.get("content")
-        if isinstance(content, str) and content:
-            clean, f = g.engine.scan_output_text(ctx, content, ("choices", i, "message", "content"))
-            content_cleans[i] = clean
-            findings.extend(f)
+        for field_name in TEXT_FIELDS:
+            text = msg.get(field_name)
+            if isinstance(text, str) and text:
+                clean, f = g.engine.scan_output_text(ctx, text, ("choices", i, "message", field_name))
+                content_cleans[(i, field_name)] = clean
+                findings.extend(f)
+        if isinstance(msg.get("function_call"), dict):
+            # legacy functions API: the same checks as a tool call (arguments are redacted in place)
+            legacy = [{"id": "function_call", "type": "function", "function": msg["function_call"]}]
+            findings.extend(await g.engine.inspect_tool_calls(ctx, body, legacy, ("choices", i, "message", "function_call_legacy")))
+            msg["_bouncer_legacy"] = legacy
         if msg.get("tool_calls"):
             findings.extend(await g.engine.inspect_tool_calls(ctx, body, msg["tool_calls"], ("choices", i, "message", "tool_calls")))
     ctx.direction = "output"
@@ -318,10 +328,15 @@ async def finish_plain(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], o
     # apply output redactions and record allowed tool calls
     for i, choice in enumerate(out.get("choices") or []):
         msg = choice.get("message") or {}
-        if i in content_cleans:
-            red = [f for f in findings if f.location[:2] == ("choices", i) and f.direction == "output" and f.effective_action == Action.REDACT]
-            msg["content"] = apply_redactions(content_cleans[i], red)
-        for tc in msg.get("tool_calls") or []:
+        for field_name in TEXT_FIELDS:
+            if (i, field_name) in content_cleans:
+                red = [
+                    f
+                    for f in findings
+                    if f.location[:4] == ("choices", i, "message", field_name) and f.direction == "output" and f.effective_action == Action.REDACT
+                ]
+                msg[field_name] = apply_redactions(content_cleans[(i, field_name)], red)
+        for tc in (msg.get("tool_calls") or []) + (msg.pop("_bouncer_legacy", None) or []):
             meta = tc.pop("_bouncer", None)
             if meta:
                 g.store.record_tool_call(ctx.session_id, meta["call_hash"])
@@ -426,6 +441,7 @@ async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], f
         tool_buf: dict[int, dict[str, Any]] = {}
         usage = None
         finish_reason = None
+        legacy_function_call = False
         try:
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):
@@ -445,6 +461,10 @@ async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], f
                     delta = ch.get("delta") or {}
                     if ch.get("finish_reason"):
                         finish_reason = ch["finish_reason"]
+                    if delta.get("function_call"):
+                        legacy_function_call = True
+                    for field_name in ("reasoning_content", "reasoning"):
+                        delta.pop(field_name, None)  # not forwarded in streams: it cannot be checked incrementally
                     for tc in delta.get("tool_calls") or []:
                         idx = tc.get("index", 0)
                         buf = tool_buf.setdefault(idx, {"id": None, "type": "function", "function": {"name": "", "arguments": ""}})
@@ -472,6 +492,17 @@ async def start_stream(g: GatewayState, ctx: RequestCtx, body: dict[str, Any], f
                     yield _sse(base, {"content": rest})
             findings = list(guard.findings)
             tool_calls = [tool_buf[i] for i in sorted(tool_buf)]
+            if legacy_function_call:
+                findings.append(
+                    ctx_finding(
+                        g,
+                        "tool_governance",
+                        "legacy_function_call",
+                        "The model answered with the legacy function_call format in a stream, which Bouncer does not "
+                        "check incrementally. Use the tools API (tool_calls) or a non-streaming request.",
+                        "medium",
+                    )
+                )
             if tool_calls and guard.blocked is None:
                 findings.extend(await g.engine.inspect_tool_calls(ctx, body, tool_calls, ("choices", 0, "message", "tool_calls")))
             ctx.direction = "tool_call" if tool_calls else "output"
