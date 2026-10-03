@@ -113,6 +113,11 @@ class Engine:
 
     # ------------------------------------------------------------------ context
     def begin(self, principal: Principal, route: str, session_id: str, model: str | None) -> RequestCtx:
+        # sessions are namespaced by the calling agent, so one agent cannot taint, pause or spend another
+        # agent's session by reusing its session id (a delegated call gets its own namespace too)
+        key = principal_key(principal)
+        if not session_id.startswith(key + "/"):
+            session_id = f"{key}/{session_id}"
         policy = self.policies.current
         profile = policy.profile_for(principal)
         variant = policy.variant(profile)
@@ -417,9 +422,9 @@ class Engine:
 
         # an approved identical input passes its require_approval findings; the key is a hash of the raw
         # text and is never stored as text (the audit excerpt is taken after redaction, below)
-        ctx.input_key = call_hash("input", _excerpt(body, doc.audit.excerpt_chars))
+        ctx.input_key = call_hash("input", request_text(body))
         if any(f.action == Action.REQUIRE_APPROVAL for f in findings):
-            appr = self.store.approved(ctx.principal.id, ctx.input_key)
+            appr = self.store.approved(principal_key(ctx.principal), ctx.input_key, ctx.session_id)
             if appr is not None:
                 for f in findings:
                     if f.action == Action.REQUIRE_APPROVAL:
@@ -769,7 +774,7 @@ class Engine:
                 f.source = f"tool_call:{name}"
                 f.location = f.location or loc
             # approvals: an approved identical call passes the require_approval findings
-            appr = self.store.approved(ctx.principal.id, h)
+            appr = self.store.approved(principal_key(ctx.principal), h, ctx.session_id)
             if appr is not None:
                 for f in call_findings:
                     if f.action == Action.REQUIRE_APPROVAL:
@@ -1020,6 +1025,7 @@ class Engine:
             h, tool, args = call["call_hash"], call["tool"], json.dumps(call["arguments"], ensure_ascii=False)[:500]
         appr = self.store.create_approval(
             principal=ctx.principal.id,
+            principal_key=principal_key(ctx.principal),
             team=ctx.principal.team,
             session_id=ctx.session_id,
             call_hash=h,
@@ -1223,6 +1229,10 @@ def _excerpt(body: dict[str, Any], n: int) -> str:
         if isinstance(m, dict) and m.get("role") in ("user", "tool") and isinstance(m.get("content"), str):
             return m["content"][:n]
     return ""
+
+
+def principal_key(principal: Principal) -> str:
+    return f"{principal.via}>{principal.id}" if principal.via else principal.id
 
 
 def describe_source(source: str) -> str:

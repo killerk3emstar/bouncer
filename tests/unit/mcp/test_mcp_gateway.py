@@ -406,7 +406,7 @@ def test_lethal_trifecta_over_mcp_requires_approval(env: dict[str, Any]) -> None
     session = "mcp-trifecta"
     assert not _run(_call("web.fetch", {"url": "https://vendor.example/pricing"}, session=session)).is_error
     assert not _run(_call("crm.lookup_customer", {"query": "C-10007"}, session=session)).is_error
-    taint = env["gw"].store.session(session).taint
+    taint = env["gw"].store.session(f"ops-copilot/{session}").taint  # sessions are namespaced by agent
     assert {"untrusted", "sensitive"} <= taint
     args = {"from_account": "PL61109010140000071219812874", "to_iban": "DE89370400440532013000", "amount": 120, "currency": "EUR", "title": "Invoice 42"}
     res = _run(_call("payments.create_transfer", args, session=session))

@@ -35,7 +35,8 @@ class Approval:
     trace_id: str
     created_at: float
     expires_at: float
-    status: str = "pending"  # pending | approved | denied | expired
+    status: str = "pending"  # pending | approved | denied | expired | used
+    principal_key: str = ""  # principal id, or "<caller>><principal>" for a delegated call
     decided_at: float | None = None
     note: str | None = None
     allow_until: float | None = None
@@ -78,7 +79,8 @@ class Store:
         self.team_tokens: dict[str, deque] = defaultdict(deque)  # team -> (ts, tokens)
         self.team_gpu: dict[str, deque] = defaultdict(deque)  # team -> (ts, gpu seconds)
         self.team_requests: dict[str, int] = defaultdict(int)
-        self.sessions: dict[str, SessionState] = defaultdict(SessionState)
+        self.sessions: OrderedDict[str, SessionState] = OrderedDict()
+        self.max_sessions = 50_000  # oldest sessions are evicted; session ids are chosen by clients
         self.approvals: dict[str, Approval] = {}
         self.scan_cache: OrderedDict[tuple, Any] = OrderedDict()
         self.scan_cache_size = scan_cache_size
@@ -86,6 +88,17 @@ class Store:
         self.scan_cache_misses = 0
         self.mcp_pins: dict[str, dict[str, str]] = defaultdict(dict)  # server -> tool -> definition hash
         self.mcp_pending: dict[str, dict[str, str]] = defaultdict(dict)
+
+    def _sess(self, session_id: str) -> SessionState:
+        with self._lock:
+            sess = self.sessions.get(session_id)
+            if sess is None:
+                sess = self.sessions[session_id] = SessionState()
+                while len(self.sessions) > self.max_sessions:
+                    self.sessions.popitem(last=False)
+            else:
+                self.sessions.move_to_end(session_id)
+            return sess
 
     def reset(self) -> None:
         self.__init__(self.scan_cache_size)  # type: ignore[misc]
@@ -101,7 +114,7 @@ class Store:
             self.team_tokens[team].append((now, tokens))
             if gpu_seconds:
                 self.team_gpu[team].append((now, gpu_seconds))
-            self.sessions[session_id].usd += usd
+            self._sess(session_id).usd += usd
             self.team_requests[team] += 1
 
     def replay_spend(self, events: Any) -> int:
@@ -121,7 +134,7 @@ class Store:
             cost = float(usage.get("cost_usd") or 0)
             if team and cost:
                 self.team_usd[(team, today)] += cost
-                self.sessions[ev.get("session_id", "")].usd += cost
+                self._sess(ev.get("session_id", "")).usd += cost
             if team:
                 self.team_requests[team] += 1
             n += 1
@@ -142,24 +155,24 @@ class Store:
 
     # ------------------------------------------------------------------ sessions
     def session(self, session_id: str) -> SessionState:
-        s = self.sessions[session_id]
+        s = self._sess(session_id)
         s.last_seen = time.time()
         return s
 
     def mark_taint(self, session_id: str, kind: str, source: str) -> None:
         with self._lock:
-            s = self.sessions[session_id]
+            s = self._sess(session_id)
             s.taint.add(kind)
             if source not in s.taint_sources[kind]:
                 s.taint_sources[kind].append(source)
 
     def record_tool_call(self, session_id: str, call_hash: str) -> None:
         with self._lock:
-            self.sessions[session_id].tool_calls.append((time.time(), call_hash))
+            self._sess(session_id).tool_calls.append((time.time(), call_hash))
 
     def identical_calls(self, session_id: str, call_hash: str, window_seconds: float) -> int:
         cutoff = time.time() - window_seconds
-        s = self.sessions[session_id]
+        s = self._sess(session_id)
         return sum(1 for ts, h in s.tool_calls if h == call_hash and ts >= cutoff)
 
     # ------------------------------------------------------------------ approvals
@@ -197,16 +210,21 @@ class Store:
                 appr.allow_until = now + ttl_seconds
             return appr
 
-    def approved(self, principal: str, call_hash: str) -> Approval | None:
+    def approved(self, principal_key: str, call_hash: str, session_id: str | None = None) -> Approval | None:
+        """An approval allows exactly one identical call, by the same agent in the same session, within its
+        window. It is consumed when used."""
         now = time.time()
-        for appr in self.approvals.values():
-            if (
-                appr.status == "approved"
-                and appr.principal == principal
-                and appr.call_hash == call_hash
-                and (appr.allow_until or 0) >= now
-            ):
-                return appr
+        with self._lock:
+            for appr in self.approvals.values():
+                if (
+                    appr.status == "approved"
+                    and (appr.principal_key or appr.principal) == principal_key
+                    and appr.call_hash == call_hash
+                    and (session_id is None or appr.session_id == session_id)
+                    and (appr.allow_until or 0) >= now
+                ):
+                    appr.status = "used"
+                    return appr
         return None
 
     def list_approvals(self, status: str | None = None) -> list[Approval]:

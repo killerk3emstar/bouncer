@@ -71,9 +71,9 @@ async def run_guard(g: Any, principal: Any, payload: GuardRequest, route: str = 
             if payload.direction == "tool_result" and tool:
                 tg = ctx.doc.controls.tool_governance
                 if tg is not None and tool in tg.untrusted_source_tools:
-                    g.store.mark_taint(sid, "untrusted", tool)
+                    g.store.mark_taint(ctx.session_id, "untrusted", tool)
                 if tg is not None and tool in tg.sensitive_source_tools:
-                    g.store.mark_taint(sid, "sensitive", tool)
+                    g.store.mark_taint(ctx.session_id, "sensitive", tool)
         findings.extend(seg_findings)
         ctx.excerpt = g.engine.audit_mask(ctx, clean, payload.direction)[: ctx.doc.audit.excerpt_chars]
         ctx.direction = payload.direction
@@ -94,7 +94,7 @@ async def run_guard(g: Any, principal: Any, payload: GuardRequest, route: str = 
         redacted = apply_redactions(clean, red)
     if decision.action < Action.REQUIRE_APPROVAL and payload.tool_call is not None:
         for rec in ctx.tool_calls:
-            g.store.record_tool_call(sid, rec["call_hash"])
+            g.store.record_tool_call(ctx.session_id, rec["call_hash"])
     event = g.engine.finish(ctx, decision.action, direction=ctx.direction)
     body_out = {
         "action": decision.action.label,

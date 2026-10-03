@@ -578,7 +578,7 @@ class BouncerMcpMiddleware(Middleware):
             return self._upstream_call_error(ctx, str(exc), Action.ALLOW, "tool_call", mcp_info)
 
         # 2. circuit breaker from an earlier loop in this session
-        sess = g.store.session(sid)
+        sess = g.store.session(ctx.session_id)
         now = time.time()
         if sess.breaker_until > now:
             findings.append(
@@ -616,7 +616,7 @@ class BouncerMcpMiddleware(Middleware):
             engine.finish(ctx, decision.action, direction="tool_call", extra={"mcp": mcp_info})
             return gw.error_result(ctx, decision.action, decision.code, decision.message, ctx.approval_id)
         for rec in ctx.tool_calls:
-            g.store.record_tool_call(sid, rec["call_hash"])
+            g.store.record_tool_call(ctx.session_id, rec["call_hash"])
 
         # 4. forward to the upstream
         if fwd_args is not args:

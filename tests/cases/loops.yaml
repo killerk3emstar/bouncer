@@ -107,3 +107,16 @@
       - {role: tool, tool_call_id: a3, content: "No results."}
   mock_response: {tool_calls: [{name: kb__search, arguments: {query: "fees"}}]}
   expect: {action: allow}
+
+- id: loops-breaker-does-not-cross-agents
+  control: loops
+  kind: allow
+  owasp_llm: [LLM10]
+  owasp_agentic: [ASI08]
+  steps:
+    - {principal: ops-copilot, session: shared-sid, request: {model: gpt-4o-mini, messages: [{role: user, content: "Find fees."}]}, mock_response: {tool_calls: [{name: kb__search, arguments: {query: "fees"}}]}, expect: {action: allow}}
+    - {principal: ops-copilot, session: shared-sid, request: {model: gpt-4o-mini, messages: [{role: user, content: "Find fees."}]}, mock_response: {tool_calls: [{name: kb__search, arguments: {query: "fees"}}]}, expect: {action: allow}}
+    - {principal: ops-copilot, session: shared-sid, request: {model: gpt-4o-mini, messages: [{role: user, content: "Find fees."}]}, mock_response: {tool_calls: [{name: kb__search, arguments: {query: "fees"}}]}, expect: {action: allow}}
+    - {principal: ops-copilot, session: shared-sid, request: {model: gpt-4o-mini, messages: [{role: user, content: "Find fees."}]}, mock_response: {tool_calls: [{name: kb__search, arguments: {query: "fees"}}]}, expect: {action: block, findings: [loops.identical_tool_calls]}}
+    # another agent that reuses the same session id is not paused by the first agent's breaker
+    - {principal: playground, session: shared-sid, request: {model: gpt-4o-mini, messages: [{role: user, content: "What are the branch hours?"}]}, expect: {action: allow, status: 200}}
