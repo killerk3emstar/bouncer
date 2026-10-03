@@ -31,7 +31,7 @@ export default {
       el.innerHTML = String(html`
         <div class="view-head"><h1>Approvals</h1><span class="sub">${pending.length} pending</span><span class="spacer"></span><span class="hint">refreshes every 5 s</span></div>
         ${err ? errorBox(err, 'GET /api/approvals') : ''}
-        <div class="notice notice-info">An approval allows exactly the held call (same tool, same arguments hash) for the policy's approval TTL. The agent has to send the call again; any other call is checked as usual. Arguments are shown masked.</div>
+        <div class="notice notice-info">An approval allows the held call once: same agent, same session, same tool and arguments hash, within the policy's approval TTL. The agent has to send the call again; any other call is checked as usual. Arguments are shown masked.'s approval TTL. The agent has to send the call again; any other call is checked as usual. Arguments are shown masked.</div>
         <div class="card" style="padding:0;margin-bottom:12px"><div class="table-wrap"><table class="tbl">
           <thead><tr><th>Requested</th><th title="Sorted by expiry, soonest first">Expires</th><th>Principal</th><th>Tool call</th><th>Why it was held</th><th>Decision</th></tr></thead>
           <tbody>${pending.length ? pending.map((a) => html`<tr data-id="${a.id}">
