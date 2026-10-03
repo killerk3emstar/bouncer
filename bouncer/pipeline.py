@@ -387,10 +387,12 @@ class Engine:
         if any(f.control == "pii" for f in findings):
             self.store.mark_taint(ctx.session_id, "sensitive", "pii in conversation")
 
-        # T1 + T2 on untrusted segments
+        # T1 + T2 on untrusted segments, skipped when a deterministic rule already blocks the request
         pi = doc.controls.prompt_injection if _enabled(doc.controls.prompt_injection) else None
-        if pi is not None:
+        if pi is not None and not self._enforced_block(ctx, findings):
             findings.extend(await self._semantic_injection(ctx, cleaned, pi))
+        elif pi is not None:
+            ctx.notes.append("semantic layers skipped: a deterministic control already blocks this request")
 
         # an approved identical input passes its require_approval findings
         ctx.excerpt = _excerpt(body, doc.audit.excerpt_chars)
@@ -413,6 +415,16 @@ class Engine:
                 pass  # decoded-view findings carry the blob span; normalized-view ones are emitted as block by controls
         ctx.findings.extend(findings)
         return self._decision(ctx, findings, action, phase="input")
+
+    def _enforced_block(self, ctx: RequestCtx, findings: list[Finding]) -> bool:
+        """True when some finding will block regardless of later layers (not monitor, not permissive-capped)."""
+        for f in findings:
+            if f.action < Action.BLOCK or self._mode_for(ctx, f.control) == "monitor":
+                continue
+            if ctx.scan.profile == "permissive" and SEVERITY_ORDER.get(f.severity, 2) < 4:
+                continue
+            return True
+        return False
 
     def _enforce_pii_for_external_model(self, ctx: RequestCtx, findings: list[Finding]) -> None:
         """Clearance lets a principal see PII, but PII still must not reach an external model provider."""
@@ -992,6 +1004,7 @@ class Engine:
             "policy": {"version": ctx.policy.version, "profile": ctx.scan.profile, "mode": ctx.doc.defaults.mode},
             "approval_id": ctx.approval_id,
             "downgraded_from": ctx.downgraded_from,
+            "notes": ctx.notes,
             "excerpt": ctx.excerpt,
         }
         if extra:

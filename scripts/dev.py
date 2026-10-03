@@ -56,8 +56,8 @@ def main() -> int:
                 p.kill()
         sys.exit(0)
 
-    signal.signal(signal.SIGINT, stop)
-    signal.signal(signal.SIGTERM, stop)
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, stop)
     while True:
         for name, p in procs:
             if p.poll() is not None:
