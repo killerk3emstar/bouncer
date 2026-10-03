@@ -277,7 +277,7 @@ _CASE_COUNTS: dict[str, Any] = {"key": None, "value": None}
 
 def _case_counts() -> dict[str, dict[str, int]]:
     """Test cases per control, re-read only when a file in tests/cases/ changes."""
-    files = sorted((ROOT / "tests" / "cases").glob("*.yaml"))
+    files = sorted((ROOT / "tests" / "cases").glob("*.yaml")) + [p for p in UNIT_TEST_FILES.values() if p.exists()]
     key = tuple((p.name, p.stat().st_mtime_ns) for p in files)
     if _CASE_COUNTS["key"] == key:
         return _CASE_COUNTS["value"]
@@ -286,8 +286,17 @@ def _case_counts() -> dict[str, dict[str, int]]:
     return value
 
 
+# controls whose behavior is tested with pytest unit tests rather than YAML cases (counted per test function)
+UNIT_TEST_FILES = {"mcp_pinning": ROOT / "tests" / "unit" / "mcp" / "test_mcp_gateway.py"}
+
+
 def _read_case_counts() -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = defaultdict(lambda: {"allow": 0, "block": 0, "total": 0})
+    for ctl, path in UNIT_TEST_FILES.items():
+        if path.exists():
+            n = sum(1 for line in path.read_text().splitlines() if line.startswith("def test_"))
+            counts[ctl]["total"] += n
+            counts[ctl]["block"] += n
     for path in sorted((ROOT / "tests" / "cases").glob("*.yaml")):
         try:
             data = yaml.safe_load(path.read_text()) or []
