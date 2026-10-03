@@ -14,7 +14,26 @@ Repo HEAD at the final pass: `879487c` plus uncommitted edits in the working tre
 
 ---
 
-## Open findings
+## Status after fixes (2026-10-04 02:10, lead)
+
+All findings in this report were fixed after the review, each with a regression test in `make test`, except the items marked open.
+
+| Finding | Status | Test |
+|---|---|---|
+| HIGH-1 MCP non-text content blocks not scanned | fixed: embedded text resources scanned and redacted, image/audio/blob blocks withheld | tests/unit/mcp `test_embedded_resource_in_result_is_scanned` |
+| MCP blocked-result excerpt raw | fixed: excerpt goes through `Engine.audit_mask` | tests/unit/mcp `test_blocked_result_excerpt_is_masked` |
+| Content parts with a non-standard `type` forwarded unscanned | fixed: any part with a `text` field is scanned | `test_content_parts_of_any_type_are_scanned` |
+| CSV formula injection | fixed | `test_csv_neutralizes_formulas` |
+| Rotating `X-Bouncer-Session` evades per-session limits | open by design: the client chooses its session id; sessions are now namespaced per agent, and the per-team limits (USD per day, tokens per minute, GPU seconds) are the hard backstop. Documented in docs/THREAT_MODEL.md | `loops-breaker-does-not-cross-agents` |
+| Audit tail truncation | fixed: `<audit>.head` sidecar with the newest seq and hash (deleting both files is still possible; ship the log to a SIEM) | `test_removed_tail_lines_are_detected` |
+| `judge.allow_external` userinfo bypass | fixed: `urlsplit(url).hostname` | `test_external_judge_check_cannot_be_bypassed_with_userinfo` |
+| Feed rollback to an older signed version | fixed | tests/unit/signatures `test_rollback_to_older_signed_feed_is_refused` |
+| Items "fixed during the review" below | fixed | see the tests named in each item and tests/unit/core/test_gateway.py |
+| Judge starvation by one agent, MCP pins in memory, self-reported MCP server name | open, documented | |
+
+---
+
+## Open findings (as found during the review)
 
 ### HIGH-1 MCP tool results inside non-text content blocks are never scanned
 `bouncer/gateway/mcp_gateway.py:658-663` (`_inspect_result`)
