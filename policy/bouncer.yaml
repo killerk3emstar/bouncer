@@ -58,7 +58,7 @@ principals:
     team: operations
     data_clearance: confidential       # public < internal < confidential < restricted
     models: [qwen3:8b, gpt-4o-mini]
-    tools: [crm.lookup_customer, kb.search, web.fetch, mail.send, payments.create_transfer]
+    tools: [crm.lookup_customer, kb.search, kb.write, web.fetch, mail.send, payments.create_transfer]
   dev-assistant:
     key_env: BOUNCER_KEY_DEV_ASSISTANT
     team: engineering
@@ -137,7 +137,7 @@ controls:
     max_decode_depth: 2
 
   prompt_injection:                # OWASP LLM01, Agentic ASI01, ASI06
-    apply_to: [user, tool_result, tool_definition]
+    apply_to: [user, tool_result, tool_definition, memory_write]
     heuristics: {action: block}                        # T0: known phrasings (EN, PL, DE), chat-template tokens
     # T1 score in [0, 1]. block_above 1.0 = T1 never blocks on its own: on our business-text set it flagged
     # 26% of benign prompts at 0.5 (reports/eval.md), so a T1 hit only escalates to the T2 judge.
@@ -150,6 +150,7 @@ controls:
     side_effect_tools: [mail.send, payments.create_transfer, code.run_python]
     untrusted_source_tools: [web.fetch]
     sensitive_source_tools: [crm.lookup_customer]
+    memory_write_tools: [kb.write]  # what agents save for later is scanned like untrusted input (memory poisoning)
     unknown_tool: block            # tool not in the principal's list
     lethal_trifecta:               # untrusted input + sensitive data + outbound side effect in one session
       action: require_approval

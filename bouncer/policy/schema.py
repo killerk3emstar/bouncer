@@ -165,7 +165,7 @@ class JudgeThresholds(Strict):
 
 
 class PromptInjectionCfg(ControlCfg):
-    apply_to: list[Literal["user", "system", "tool_result", "tool_definition", "tool_call"]] = [
+    apply_to: list[Literal["user", "system", "tool_result", "tool_definition", "tool_call", "memory_write"]] = [
         "user",
         "tool_result",
         "tool_definition",
@@ -204,6 +204,7 @@ class ToolGovernanceCfg(ControlCfg):
     side_effect_tools: list[str] = []
     untrusted_source_tools: list[str] = []
     sensitive_source_tools: list[str] = []
+    memory_write_tools: list[str] = []  # content these tools persist is scanned like untrusted input
     unknown_tool: ActionName = "block"
     lethal_trifecta: TrifectaCfg = TrifectaCfg()
     goal_alignment: GoalAlignmentCfg = GoalAlignmentCfg()

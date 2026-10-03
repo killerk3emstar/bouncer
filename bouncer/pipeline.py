@@ -703,6 +703,8 @@ class Engine:
                 )
             h = call_hash(name, args)
             record = {"tool": name, "wire_name": wire, "call_hash": h, "arguments": _mask_args(args)}
+            if tg is not None and name in tg.memory_write_tools:
+                call_findings.extend(await self._scan_memory_write(ctx, name, args_text or "", loc))
             if tg is not None:
                 call_findings.extend(self._tool_rules(ctx, tg, name, args, sess))
                 if name in tg.side_effect_tools and tg.goal_alignment.enabled:
@@ -754,6 +756,22 @@ class Engine:
             tc["_bouncer"] = {"tool": name, "call_hash": h, "findings": call_findings}
             findings.extend(call_findings)
         return findings
+
+    async def _scan_memory_write(self, ctx: RequestCtx, name: str, text: str, loc: tuple[Any, ...]) -> list[Finding]:
+        """Content an agent persists to shared memory or a knowledge base is read later by other agents and
+        sessions, so it gets the same injection checks as untrusted input (OWASP Agentic ASI06)."""
+        pi = ctx.doc.controls.prompt_injection if _enabled(ctx.doc.controls.prompt_injection) else None
+        if pi is None or "memory_write" not in pi.apply_to:
+            return []
+        seg = Segment(text, "tool_call", f"memory_write:{name}", False, loc, tool=name)
+        clean, found, _ = self.scan_segment(ctx, seg, use_cache=False)
+        found = [f for f in found if f.control == "prompt_injection"]
+        if not self._enforced_block(ctx, found):
+            found += await self._semantic_injection(ctx, [(seg, clean, found)], pi)
+        for f in found:
+            f.owasp_agentic = sorted(set(f.owasp_agentic) | {"ASI06"})
+            f.message = f"{f.message} The text was about to be saved by {name}, where other agents would read it later."
+        return found
 
     def _tool_rules(self, ctx: RequestCtx, tg: Any, name: str, args: Any, sess: Any) -> list[Finding]:
         out: list[Finding] = []
@@ -1160,6 +1178,7 @@ def describe_source(source: str) -> str:
         "tool_result": f"the result of {tool}",
         "tool_definition": f"the definition of tool {tool}",
         "tool_call": f"the arguments of {tool}",
+        "memory_write": f"the content {tool} would save to shared memory",
     }.get(role, source)
 
 

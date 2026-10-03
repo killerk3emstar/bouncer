@@ -56,6 +56,7 @@ _transfer_ids = itertools.count(1)
 def reset_state() -> None:
     global _message_ids, _transfer_ids
     OUTBOX.clear()
+    _KB_NOTES.clear()
     TRANSFERS.clear()
     _message_ids = itertools.count(1)
     _transfer_ids = itertools.count(1)
@@ -124,6 +125,18 @@ def kb_search(query: str) -> str:
         for _, a in scored[:3]
     ]
     return _json({"query": query, "results": results})
+
+
+_KB_NOTES: list[dict[str, str]] = []
+
+
+def kb_write(title: str, body: str) -> str:
+    """Save a note to the shared knowledge base (in memory; other agents read it via kb.search)."""
+    if not (title or "").strip() or not (body or "").strip():
+        raise ToolError("title and body are required")
+    note = {"id": f"NOTE-{len(_KB_NOTES) + 1:03d}", "title": title.strip()[:200], "body": body.strip()[:4000]}
+    _KB_NOTES.append(note)
+    return _json({"saved": note["id"], "title": note["title"]})
 
 
 def _resolve_web_path(url: str) -> Path | None:
@@ -298,6 +311,18 @@ TOOLS: dict[str, ToolSpec] = {
                 ["from_account", "to_iban", "amount", "currency", "title"],
             ),
             payments_create_transfer,
+        ),
+        ToolSpec(
+            "kb.write",
+            "Save a note to the team knowledge base. Notes are shared with other agents and staff.",
+            _schema(
+                {
+                    "title": {"type": "string", "description": "Note title."},
+                    "body": {"type": "string", "description": "Note text."},
+                },
+                ["title", "body"],
+            ),
+            kb_write,
         ),
         ToolSpec(
             "code.run_python",

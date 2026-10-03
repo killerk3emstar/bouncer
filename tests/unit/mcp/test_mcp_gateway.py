@@ -188,7 +188,7 @@ async def _upstream_tools() -> dict[str, Any]:
 def test_list_pins_every_definition(env: dict[str, Any]) -> None:
     names = _run(_list())
     # ops-copilot may not call code.run_python, so it is not offered (least privilege)
-    assert set(names) == {"crm.lookup_customer", "kb.search", "web.fetch", "mail.send", "payments.create_transfer"}
+    assert set(names) == {"crm.lookup_customer", "kb.search", "kb.write", "web.fetch", "mail.send", "payments.create_transfer"}
     pins = env["gw"].store.mcp_pins["demo-bank"]
     assert set(pins) == set(demo_tools.TOOL_NAMES)
     assert all(h.startswith("sha256:") and len(h) == 71 for h in pins.values())
