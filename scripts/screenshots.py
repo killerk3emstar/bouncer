@@ -53,13 +53,13 @@ async def main() -> None:
             views.append((f"trace_{action}", f"#/events/{tr}", None))
     async with async_playwright() as p:
         browser = await p.chromium.launch()
-        ctx = await browser.new_context(viewport={"width": 1440, "height": 900}, device_scale_factor=2, color_scheme=args.theme)
+        ctx = await browser.new_context(viewport={"width": 1440, "height": 1000}, device_scale_factor=2, color_scheme=args.theme)
         page = await ctx.new_page()
         for name, frag, _ in views:
             await page.goto(f"{args.base}/ui/{frag}")
             await page.wait_for_timeout(2500)
             path = OUT / f"dashboard_{name}.png"
-            await page.screenshot(path=str(path), full_page=name not in ("events",))
+            await page.screenshot(path=str(path), full_page=name not in ("events",) and not name.startswith("trace_"))
             print("wrote", path.relative_to(OUT.parent.parent))
         await page.goto(f"{args.base}/reports/summary")
         await page.wait_for_timeout(800)

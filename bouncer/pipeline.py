@@ -1040,7 +1040,12 @@ class Engine:
         lat = {k: round(v, 3) for k, v in ctx.latency.items()}
         lat["gateway_overhead"] = round(max(total - ctx.latency.get("upstream", 0.0), 0.0), 3)
         lat["total"] = round(total, 3)
-        findings = ctx.findings
+        # strongest decision first, so the trace and exports lead with the rule that decided
+        findings = sorted(
+            ctx.findings,
+            key=lambda f: (int(f.effective_action if f.effective_action is not None else f.action), SEVERITY_ORDER.get(f.severity, 0), f.score),
+            reverse=True,
+        )
         mcfg = ctx.doc.models.get(ctx.model or "")
         event = {
             "type": "decision",
