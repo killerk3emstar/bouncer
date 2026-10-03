@@ -39,7 +39,7 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-q --timeout=60"
+addopts = "-q --timeout=60 --import-mode=importlib"
 markers = [
     "live: needs the running stack, real models and network (make test-live)",
 ]
