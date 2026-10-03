@@ -17,9 +17,8 @@ endpoints of a running gateway.
 
 Not implemented as specified here (open items):
 
-- **Approvals.** Deciding an approval that is no longer pending returns 200 with the unchanged approval (no 409)
-  and writes another `approval.decided` event. An invalid `decision` returns 400, not 422. `decided_by` is
-  `dashboard`. `status` can also be `used` (the approved call went through once).
+- **Approvals.** `decided_by` is `dashboard`. `status` can also be `used` (the approved call went through once;
+  an approval is single-use and bound to the agent and session of the held call).
 - **Exports.** `from` and `to` are ignored; the export reads the in-memory buffer of the last 5000 events, not the
   whole file. The file name is `bouncer-audit.jsonl` / `bouncer-audit.csv`. The CSV has 16 columns:
   `ts,seq,trace_id,principal,team,session_id,route,direction,model,action,findings,latency_ms_total,cost_usd,policy_version,excerpt,hash`
@@ -29,16 +28,15 @@ Not implemented as specified here (open items):
   controls that have cases.
 - **System events.** `feed.updated` and `feed.rejected` are not written. `/api/events` and the SSE stream return
   decision events only. `approval.decided` carries the trace id of the held request and the agent as `principal`.
-- **Playground.** `tool_name` is not supported; the simulated tool call is always `web.fetch`.
-- **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_action` (not `side_effect_tool`;
-  `monitor_async` is never emitted). The dashboard labels only `side_effect_tool`, so it shows the raw key.
-- **Budgets.** `state` is `ok`, `warning` or `exceeded`; the dashboard styles `downgraded` and `blocked`.
+- **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_tool`; `monitor_async` is never
+  emitted.
+- **Budgets.** `state` is `ok`, `warning`, `downgraded` (spent; paid requests go to the local model) or `blocked`.
 - **ATLAS ids.** Findings of `tool_governance`, `budgets`, `loops`, `mcp_pinning` and `auth` carry no ATLAS id;
   `AML.T0053` and `AML.T0010` appear only in the fixtures.
 - **Errors.** Most error bodies have no `code`. Request validation errors from FastAPI are 422 with
   `{"detail": [...]}`.
-- **Latency.** `/api/controls` and `/api/coverage` took 160 to 190 ms (they re-read the YAML cases on every call);
-  the other GET endpoints 1 to 12 ms.
+- **Latency.** GET endpoints answer in about 1 to 12 ms; the YAML case counts behind `/api/controls` and
+  `/api/coverage` are re-read only when a file in `tests/cases/` changes.
 
 Shapes that differ from the examples below (the dashboard handles them):
 
@@ -48,8 +46,8 @@ Shapes that differ from the examples below (the dashboard handles them):
   `message`, `direction`, `source` and `view`. `judge` is `{"invoked": false}` when T2 did not run; `usage` is `{}`
   when nothing was billed; `upstream` is `null` for MCP events (the server is in `mcp.server`). Delegated requests
   have `principal.via`.
-- `/api/events/{trace_id}` returns the last event of the trace from the in-memory buffer; `chain_ok` checks that
-  event against its `prev_hash`.
+- `/api/events/{trace_id}` returns every event of the trace from the in-memory buffer, the decision first (then,
+  for example, `approval.decided`); `chain_ok` checks each of them against its `prev_hash`.
 - Block messages name the rule, the reason and the next step but do not end with the trace id; the trace id is in
   the `trace_id` field of the error body and in the `X-Bouncer-Trace-Id` header.
 - SSE: an initial `: connected` comment, then `: keepalive` after 15 s without events.
