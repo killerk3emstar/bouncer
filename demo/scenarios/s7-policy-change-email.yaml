@@ -1,0 +1,19 @@
+id: s7-policy-change-email
+title: Policy change on the fly (e-mail redact, then block)
+description: With the default policy the customer e-mail in the prompt is redacted; after changing controls.pii.entities.EMAIL to block in policy/bouncer.yaml the same request is blocked without a restart.
+principal: ops-copilot
+model: gpt-4o-mini
+tools: [crm.lookup_customer, kb.search, web.fetch, mail.send, payments.create_transfer]
+user: Draft a short reply to natasza.dawidczyk@mailbox.example explaining the foreign ATM fee.
+responses:
+  - content: >-
+      Dear Customer, withdrawals from foreign ATMs cost 2.5% of the amount, minimum 5 PLN.
+      Domestic ATM withdrawals are free. Kind regards, Example Bank.
+# Expectation for the shipped policy (EMAIL: redact). After the edit, expect outcome blocked, code pii.*.
+expect:
+  outcome: completed
+  stop_step: 1
+  steps:
+    - {step: 1, action: redact, findings: ["pii.EMAIL"]}
+  upstream_must_not_contain:
+    - natasza.dawidczyk@mailbox.example

@@ -1,0 +1,25 @@
+id: s5-team-budget
+title: Interns team runs out of its daily budget
+description: The interns team has the tightest budget; repeated heavy calls on the local model exhaust its tokens-per-minute / daily allowance and the next call is blocked with HTTP 429.
+principal: intern-bot
+model: qwen3:8b
+tools: [kb.search]
+user: Prepare a one-page summary of all fees, limits and KYC rules for new joiners.
+# intern-bot may use only qwen3:8b (free local model), so the USD budget never trips; the limit
+# that bites is interns.tokens_per_minute (5000) / gpu_seconds_per_hour (60). Each scripted response
+# reports a large token count so the budget is spent within a few calls and the next call is blocked.
+responses:
+  - tool_calls: [{name: kb__search, arguments: {query: fees}}]
+    usage: {prompt_tokens: 4000, completion_tokens: 1000}
+  - tool_calls: [{name: kb__search, arguments: {query: transfer limits}}]
+    usage: {prompt_tokens: 4000, completion_tokens: 1000}
+  - tool_calls: [{name: kb__search, arguments: {query: kyc procedure}}]
+    usage: {prompt_tokens: 4000, completion_tokens: 1000}
+  - content: Summary of fees, limits and KYC rules for new joiners.
+    usage: {prompt_tokens: 4000, completion_tokens: 1000}
+expect:
+  outcome: blocked
+  code: ["budgets.*"]
+  stop_step: [1, 2, 3]
+  steps:
+    - {step: 1, action: allow}
