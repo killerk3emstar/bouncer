@@ -70,7 +70,7 @@ principals:
     team: interns
     profile: strict                    # per-principal profile override
     data_clearance: internal
-    models: [qwen3:8b]
+    models: [gpt-4o-mini, qwen3:8b]    # the paid model is downgraded to qwen3:8b once the team budget is spent
     tools: [kb.search]
   playground:
     key_env: BOUNCER_KEY_PLAYGROUND    # used by the dashboard playground
