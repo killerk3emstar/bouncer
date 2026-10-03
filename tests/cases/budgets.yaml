@@ -1,0 +1,112 @@
+# Budgets, rate limits and model downgrade (OWASP LLM10 unbounded consumption, Agentic ASI08).
+
+- id: budgets-allow-within-budget
+  control: budgets
+  kind: allow
+  owasp_llm: [LLM10]
+  principal: ops-copilot
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "What is the daily ATM withdrawal limit for a standard card?"}]}
+  expect: {action: allow, status: 200}
+
+- id: budgets-allow-local-model-within-gpu-budget
+  control: budgets
+  kind: allow
+  owasp_llm: [LLM10]
+  principal: intern-bot
+  request: {model: "qwen3:8b", messages: [{role: user, content: "Summarize the onboarding checklist in three bullets."}]}
+  expect: {action: allow}
+
+- id: budgets-allow-injects-max-tokens
+  control: budgets
+  kind: allow
+  owasp_llm: [LLM10]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Explain idempotency keys in payment APIs."}]}
+  expect: {action: allow, upstream_must_contain: ["\"max_tokens\": 2048"]}
+
+- id: budgets-allow-client-max-tokens-kept
+  control: budgets
+  kind: allow
+  owasp_llm: [LLM10]
+  principal: dev-assistant
+  request: {model: gpt-4o-mini, max_tokens: 64, messages: [{role: user, content: "One sentence on retries with backoff."}]}
+  expect: {action: allow, upstream_must_contain: ["\"max_tokens\": 64"]}
+
+- id: budgets-downgrade-when-team-budget-spent
+  control: budgets
+  kind: log
+  owasp_llm: [LLM10]
+  owasp_agentic: [ASI08]
+  principal: ops-copilot
+  policy_patch: {budgets: {teams: {operations: {usd_per_day: 0.0}}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply about card delivery times."}]}
+  expect: {action: log, status: 200, findings: [budgets.team_usd_per_day], downgraded_to: "qwen3:8b", upstream_must_contain: ["\"model\": \"qwen3:8b\""]}
+
+- id: budgets-block-when-downgrade-disabled
+  control: budgets
+  kind: block
+  owasp_llm: [LLM10]
+  principal: ops-copilot
+  policy_patch: {budgets: {teams: {operations: {usd_per_day: 0.0}}, on_exceed: {action: block}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply about card delivery times."}]}
+  expect: {action: block, status: 429, findings: [budgets.team_usd_per_day], upstream_called: false}
+
+- id: budgets-spend-then-downgrade
+  control: budgets
+  kind: log
+  owasp_llm: [LLM10]
+  principal: ops-copilot
+  # one request at this illustrative price costs more than the 5 USD daily budget
+  policy_patch: {models: {gpt-4o-mini: {price_per_1m_tokens: {input: 200000.0, output: 200000.0}}}}
+  steps:
+    - session: spend-s1
+      request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply about card delivery times, please keep it short."}]}
+      expect: {action: allow}
+    - session: spend-s2   # a new session, so only the team budget applies
+      request: {model: gpt-4o-mini, messages: [{role: user, content: "And one about replacement cards."}]}
+      expect: {action: log, findings: [budgets.team_usd_per_day], downgraded_to: "qwen3:8b"}
+
+- id: budgets-block-local-gpu-hour
+  control: budgets
+  kind: block
+  owasp_llm: [LLM10]
+  principal: intern-bot
+  policy_patch: {budgets: {teams: {interns: {gpu_seconds_per_hour: 0}}}}
+  request: {model: "qwen3:8b", messages: [{role: user, content: "Summarize the onboarding checklist."}]}
+  expect: {action: block, status: 429, findings: [budgets.gpu_seconds_per_hour], upstream_called: false}
+
+- id: budgets-block-tokens-per-minute
+  control: budgets
+  kind: block
+  owasp_llm: [LLM10]
+  principal: dev-assistant
+  policy_patch: {budgets: {teams: {engineering: {tokens_per_minute: 20}}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Please review this long design note about retry policies, idempotency, circuit breakers and timeouts in our payment services."}]}
+  expect: {action: block, status: 429, findings: [budgets.tokens_per_minute]}
+
+- id: budgets-block-max-input-tokens
+  control: budgets
+  kind: block
+  owasp_llm: [LLM10]
+  principal: dev-assistant
+  policy_patch: {budgets: {requests: {max_input_tokens: 10}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Please review this long design note about retry policies, idempotency and timeouts."}]}
+  expect: {action: block, status: 403, findings: [budgets.max_input_tokens]}
+
+- id: budgets-block-session-usd
+  control: budgets
+  kind: block
+  owasp_llm: [LLM10]
+  principal: ops-copilot
+  policy_patch: {budgets: {sessions: {max_usd: 0.0}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply about card delivery times."}]}
+  expect: {action: block, status: 429, findings: [budgets.session_usd]}
+
+- id: budgets-monitor-mode-logs-only
+  control: budgets
+  kind: log
+  owasp_llm: [LLM10]
+  principal: ops-copilot
+  policy_patch: {budgets: {mode: monitor, teams: {operations: {usd_per_day: 0.0}}, on_exceed: {action: block}}}
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "Draft a reply about card delivery times."}]}
+  expect: {action: log, status: 200, findings: [budgets.team_usd_per_day]}

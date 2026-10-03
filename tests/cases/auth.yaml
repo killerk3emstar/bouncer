@@ -1,0 +1,82 @@
+# Agent authentication and model allowlists (OWASP LLM06, Agentic ASI03).
+- id: auth-block-missing-key
+  control: auth
+  kind: block
+  owasp_llm: [LLM06]
+  principal: playground
+  auth: false
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "What are the branch opening hours?"}]}
+  expect: {action: block, status: 401, findings: [auth.invalid_key], upstream_called: false}
+
+- id: auth-block-unknown-key
+  control: auth
+  kind: block
+  owasp_llm: [LLM06]
+  principal: playground
+  api_key: bk_not_issued_to_anyone
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "What are the branch opening hours?"}]}
+  expect: {action: block, status: 401, findings: [auth.invalid_key], upstream_called: false}
+
+- id: auth-block-model-not-allowed-for-intern
+  control: auth
+  kind: block
+  owasp_llm: [LLM06]
+  principal: intern-bot
+  request: {model: gpt-4.1, messages: [{role: user, content: "Summarize the onboarding checklist."}]}
+  expect: {action: block, status: 403, findings: [auth.model_not_allowed], upstream_called: false}
+
+- id: auth-block-model-not-in-policy
+  control: auth
+  kind: block
+  owasp_llm: [LLM06]
+  principal: ops-copilot
+  request: {model: gpt-9-ultra, messages: [{role: user, content: "Summarize the onboarding checklist."}]}
+  expect: {action: block, status: 403, findings: [auth.model_not_allowed], upstream_called: false}
+
+- id: auth-block-missing-model
+  control: auth
+  kind: block
+  owasp_llm: [LLM06]
+  principal: ops-copilot
+  request: {messages: [{role: user, content: "Summarize the onboarding checklist."}]}
+  expect: {action: block, status: 403, findings: [auth.model_missing], upstream_called: false}
+
+- id: auth-block-other-agents-model
+  control: auth
+  kind: block
+  owasp_llm: [LLM06]
+  principal: ops-copilot
+  request: {model: gpt-4.1, messages: [{role: user, content: "Summarize the onboarding checklist."}]}
+  expect: {action: block, status: 403, findings: [auth.model_not_allowed]}
+
+- id: auth-allow-ops-copilot-mini
+  control: auth
+  kind: allow
+  owasp_llm: [LLM06]
+  principal: ops-copilot
+  request: {model: gpt-4o-mini, messages: [{role: user, content: "What is the cut-off time for same-day domestic transfers?"}]}
+  expect: {action: allow, status: 200, upstream_called: true}
+
+- id: auth-allow-dev-assistant-large-model
+  control: auth
+  kind: allow
+  owasp_llm: [LLM06]
+  principal: dev-assistant
+  request: {model: gpt-4.1, messages: [{role: user, content: "Explain the difference between a mutex and a semaphore."}]}
+  expect: {action: allow, status: 200}
+
+- id: auth-allow-intern-local-model
+  control: auth
+  kind: allow
+  owasp_llm: [LLM06]
+  principal: intern-bot
+  request: {model: "qwen3:8b", messages: [{role: user, content: "List three good practices for writing meeting notes."}]}
+  expect: {action: allow, status: 200}
+
+- id: auth-allow-models-endpoint-shape
+  control: auth
+  kind: allow
+  owasp_llm: [LLM06]
+  principal: playground
+  request: {model: gpt-4o-mini, messages: [{role: system, content: "You are a helpful assistant for bank staff."}, {role: user, content: "Draft a polite reminder about the quarterly training."}]}
+  expect: {action: allow, response_must_contain: ["simulated reply"]}
