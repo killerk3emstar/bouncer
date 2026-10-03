@@ -945,7 +945,9 @@ async def scenarios(request: Request) -> dict[str, Any]:
             continue
         if not isinstance(sc, dict) or "id" not in sc:
             continue
-        out.append({"id": sc["id"], "title": sc.get("title", sc["id"]), "description": sc.get("description", ""), "principal": sc.get("principal"), "expected_action": sc.get("expected_action") or (sc.get("expect") or {}).get("final_action")})
+        outcome = (sc.get("expect") or {}).get("outcome")
+        expected = " or ".join(outcome) if isinstance(outcome, list) else outcome
+        out.append({"id": sc["id"], "title": sc.get("title", sc["id"]), "description": sc.get("description", ""), "principal": sc.get("principal"), "kind": sc.get("kind", "openai"), "expected_action": expected})
     return {"mode": "scripted", "scenarios": out}
 
 

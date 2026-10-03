@@ -39,7 +39,7 @@ async def run_scenario_file(g: Any, sc: dict[str, Any]) -> dict[str, Any]:
         "title": sc.get("title"),
         "mode": "scripted",
         "started_at": now_iso(),
-        "expected_action": expect.get("outcome"),
+        "expected_action": " or ".join(expect["outcome"]) if isinstance(expect.get("outcome"), list) else expect.get("outcome"),
         "steps": [],
     }
     if sc.get("kind", "openai") == "mcp":
