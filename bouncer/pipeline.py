@@ -479,8 +479,9 @@ class Engine:
     ) -> list[Finding]:
         out: list[Finding] = []
         roles = set(pi.apply_to)
+        # the AI layers only ever see text with secrets and PII already replaced by [REDACTED:...] markers
         candidates = [
-            (seg, clean, segf)
+            (seg, apply_redactions(clean, [f for f in segf if f.control in REDACTION_CONTROLS and f.span is not None]), segf)
             for seg, clean, segf in cleaned
             if seg.role in roles and clean.strip() and not any(f.control == "prompt_injection" and f.action >= Action.BLOCK for f in segf)
         ]
@@ -491,7 +492,7 @@ class Engine:
         if pi.classifier.enabled and self.classifier is not None:
             todo, scores = [], {}
             for seg, clean, _ in candidates:
-                cached = self.store.cache_get(("t1", getattr(self.classifier, "name", "t1"), seg.digest))
+                cached = self.store.cache_get(("t1", getattr(self.classifier, "name", "t1"), _digest(clean)))
                 if cached is not None:
                     scores[seg.digest] = cached
                 else:
@@ -508,10 +509,10 @@ class Engine:
                     vals = [None] * len(todo)
                 ctx.latency["t1"] += _now_ms() - t
                 ctx.t1_ran = True
-                for (seg, _), v in zip(todo, vals, strict=True):
+                for (seg, text), v in zip(todo, vals, strict=True):
                     if v is not None:
                         scores[seg.digest] = float(v)
-                        self.store.cache_put(("t1", getattr(self.classifier, "name", "t1"), seg.digest), float(v))
+                        self.store.cache_put(("t1", getattr(self.classifier, "name", "t1"), _digest(text)), float(v))
             for seg, clean, _ in candidates:
                 score = scores.get(seg.digest)
                 english = self.is_english(clean)
@@ -1104,6 +1105,12 @@ class Engine:
 
 def _enabled(cfg: Any) -> bool:
     return cfg is not None and getattr(cfg, "enabled", True)
+
+
+def _digest(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 def _copy_finding(f: Finding) -> Finding:

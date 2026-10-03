@@ -213,3 +213,28 @@ def test_malformed_requests_get_400_not_500(env, body) -> None:  # noqa: ANN001
     r = asyncio.run(_post(app, body))
     assert r.status_code == 400, r.text
     assert r.json()["error"]["type"] == "invalid_request_error"
+
+
+def test_ai_layers_only_see_redacted_text(tmp_path: Path) -> None:
+    """T1 and the judge must never receive a secret, even when a prompt is escalated."""
+    from judge.backends.fake import FakeBackend
+
+    from bouncer.t1.fake import FakeInjectionClassifier
+
+    os.environ["BOUNCER_KEY_DEV_ASSISTANT"] = "bk_test_dev"
+    secret = "AKIAIOSFODNN7EXAMPLE"
+    prompt = f"Deploy fails with AccessDenied, config: AWS_ACCESS_KEY_ID={secret}"
+    clf = FakeInjectionClassifier()
+    judge = FakeBackend()
+    app = create_app(
+        Settings(policy_path="policy/bouncer.yaml", audit_path=str(tmp_path / "a.jsonl"), t1="fake", judge_override="fake", watch=False),
+        upstream_transport=httpx.ASGITransport(app=create_mock(MockState())),
+        classifier=clf,
+        fake_judge=judge,
+    )
+    clf.overrides = {prompt.replace(secret, "[REDACTED:aws-access-key-id]"): 0.7}  # force a T2 escalation
+    r = asyncio.run(_post(app, {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]}, key="bk_test_dev"))
+    assert r.status_code in (200, 403)
+    assert clf.calls and all(secret not in t for batch in clf.calls for t in batch)
+    assert judge.calls, "the prompt should have been escalated to the judge"
+    assert all(secret not in json.dumps(state) for state, _ in judge.calls)
