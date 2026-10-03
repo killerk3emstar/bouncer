@@ -42,8 +42,10 @@ async def run_scenario_file(g: Any, sc: dict[str, Any]) -> dict[str, Any]:
         "expected_action": expect.get("outcome"),
         "steps": [],
     }
+    if sc.get("kind", "openai") == "mcp":
+        return await _run_mcp(g, sc, out, started)
     if sc.get("kind", "openai") != "openai":
-        out.update({"final_action": None, "passed": None, "duration_ms": 0, "note": "MCP scenarios run against the MCP gateway with `make demo`; not available from the dashboard."})
+        out.update({"final_action": None, "passed": None, "duration_ms": 0, "note": f"scenario kind {sc.get('kind')} is not supported here"})
         return out
     policy = g.policies.current
     principal = policy.principal(sc["principal"])
@@ -129,6 +131,55 @@ async def run_scenario_file(g: Any, sc: dict[str, Any]) -> dict[str, Any]:
             "final_action": out["steps"][-1]["action"] if out["steps"] else None,
             "outcome": outcome,
             "code": code,
+            "passed": passed,
+            "duration_ms": round((time.perf_counter() - started) * 1000),
+        }
+    )
+    return out
+
+
+async def _run_mcp(g: Any, sc: dict[str, Any], out: dict[str, Any], started: float) -> dict[str, Any]:
+    """Drive the MCP steps through this gateway's own /mcp endpoint, as an MCP client would."""
+    import os
+
+    from demo.agent import McpUnavailable, _mcp_steps
+
+    policy = g.policies.current
+    key = next((k for k, pid in policy.keys.items() if pid == sc["principal"]), None)
+    if key is None:
+        out.update({"final_action": None, "passed": False, "note": f"no API key configured for {sc['principal']}"})
+        return out
+    port = os.environ.get("BOUNCER_PORT", "8700")
+    admin_url = os.environ.get("DEMO_MCP_ADMIN_URL", "http://127.0.0.1:8703")
+    session = f"scn_{sc['id']}_{int(time.time() * 1000)}"
+    try:
+        res = await _mcp_steps(sc, f"http://127.0.0.1:{port}/mcp", admin_url, key, session, False)
+    except McpUnavailable as exc:
+        out.update({"final_action": None, "passed": None, "duration_ms": round((time.perf_counter() - started) * 1000), "note": str(exc)})
+        return out
+    for st in res.steps:
+        ev = g.audit.get(st.trace_id) if st.trace_id else None
+        out["steps"].append(
+            {
+                "n": st.index,
+                "title": f"MCP step {st.index}: {st.detail}"[:160],
+                "trace_id": st.trace_id,
+                "action": (ev or {}).get("action") or st.action,
+                "expected_action": None,
+                "ok": True,
+                "events": [ev] if ev else [],
+            }
+        )
+    expect = sc.get("expect") or {}
+    expected = _as_list(expect.get("outcome"))
+    passed = not expected or res.outcome in expected
+    if res.block_code and expect.get("code"):
+        passed = passed and any(fnmatch.fnmatch(res.block_code, pat) for pat in _as_list(expect["code"]))
+    out.update(
+        {
+            "final_action": out["steps"][-1]["action"] if out["steps"] else None,
+            "outcome": res.outcome,
+            "code": res.block_code,
             "passed": passed,
             "duration_ms": round((time.perf_counter() - started) * 1000),
         }
