@@ -64,6 +64,14 @@ def test_case_live(case: dict[str, Any], live: LiveStack, record_property) -> No
     reason = unsupported(case, live)
     if reason:
         pytest.skip(reason)
+    if case.get("kind") == "known_gap":
+        # documented gaps of the deterministic layer; with the real T1/T2 they may or may not be stopped,
+        # so live runs report them instead of asserting an outcome
+        res = live.send(principal=case.get("principal", "playground"), session=live.session(str(case["id"])),
+                        request=copy.deepcopy(case.get("request")), guard=None, api_key=None, auth=True,
+                        mock_response=case.get("mock_response"))
+        record_property("known_gap_action_live", res.action)
+        pytest.skip(f"known T0 gap; live stack decided {res.action} (findings: {res.finding_ids or 'none'})")
     session = live.session(str(case["id"]))
     steps = case.get("steps") or [case]
     failures: list[str] = []
