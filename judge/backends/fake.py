@@ -205,7 +205,8 @@ class FakeBackend(Backend):
     # ------------------------------------------------------------------ heuristics
     def _heuristic(self, qid: str, q: dict[str, Any], fields: dict[str, str]) -> tuple[dict[str, float], list[str]]:
         keys = output_keys(q)
-        if qid == "injection" and q["type"] == "noul":
+        if qid in ("injection", "jailbreak") and q["type"] == "noul":
+            # a USER_MESSAGE key is not one of the three standard fields, so state_fields puts it into UNTRUSTED_CONTENT
             p, rules = score_injection(fields["UNTRUSTED_CONTENT"])
             return {"yes": p, "no": 1 - p}, rules
         if qid == "exfiltration" and q["type"] == "noul":

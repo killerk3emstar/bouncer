@@ -1,0 +1,700 @@
+{
+  "feed": "bouncer-community",
+  "version": 1,
+  "updated": "2026-10-03T22:28:32Z",
+  "signatures": [
+    {
+      "id": "SIG-0001",
+      "title": "Invisible Unicode tag characters (ASCII smuggling)",
+      "description": "A run of Unicode Tag code points (U+E0000-E007F) carries ASCII the model reads but the user cannot see. Strip the hidden characters and treat the source as hostile.",
+      "targets": [
+        "input",
+        "tool_result",
+        "tool_definition"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "(?<![\\U0001F3F4\\U000E0000-\\U000E007F])[\\U000E0000-\\U000E007F]{2,}"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://embracethered.com/blog/posts/2024/hiding-and-finding-text-with-unicode-tags/",
+        "https://embracethered.com/blog/posts/2024/m365-copilot-prompt-injection-tool-invocation-and-data-exfil-using-ascii-smuggling/"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "atlas": [
+        "AML.T0068",
+        "AML.T0069.000"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0002",
+      "title": "Markdown image or link smuggling data to an external URL (EchoLeak / CamoLeak class)",
+      "description": "A markdown image or link encodes data in the query string of an external URL; a client that auto-fetches it exfiltrates the data with zero clicks. Redact the URL and do not render it.",
+      "targets": [
+        "output"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "!\\[[^\\]\\n]{0,120}\\]\\(\\s*https?://[^)\\s]+[?&][^)\\s=]+=[A-Za-z0-9+/%._-]{20,}|^\\[[^\\]\\n]{1,80}\\]:\\s*https?://\\S+[?&][^\\s=]+=[A-Za-z0-9+/%._-]{20,}",
+        "flags": [
+          "m"
+        ]
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "redact",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2025-32711",
+        "https://arxiv.org/abs/2509.10540",
+        "https://www.legitsecurity.com/blog/camoleak-critical-github-copilot-vulnerability-leaks-private-source-code"
+      ],
+      "cve": [
+        "CVE-2025-32711"
+      ],
+      "owasp_llm": [
+        "LLM05",
+        "LLM02"
+      ],
+      "owasp_agentic": [],
+      "atlas": [
+        "AML.T0077",
+        "AML.T0057"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0003",
+      "title": "Chat-template control tokens in untrusted content",
+      "description": "Special chat-template tokens (ChatML <|im_start|>, Llama [INST]/<<SYS>>) inside user content or a tool result try to forge a role boundary and inject a fake system turn. Neutralize the tokens before the text reaches the model.",
+      "targets": [
+        "input",
+        "tool_result",
+        "tool_definition"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "<\\|(?:im_start|im_end|im_sep|system|user|assistant|eot_id|start_header_id|end_header_id|begin_of_text|endoftext)\\|>|\\[/?INST\\]|<</?SYS>>"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://arxiv.org/abs/2509.22830"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "atlas": [
+        "AML.T0051.001",
+        "AML.T0069.000"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0004",
+      "title": "Python pickle code-execution opcodes",
+      "description": "Pickle deserialization that reaches os.system / builtins.eval (GLOBAL and STACK_GLOBAL opcodes, also inside base64). Loading such data runs arbitrary code. Never unpickle untrusted data; use a safe format.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "flags": [
+          "s"
+        ],
+        "pattern": "pickle\\.loads?\\s*\\(\\s*base64\\.b64decode|(?:cPickle|_pickle|pickle)\\.loads?\\s*\\(\\s*(?:bytes\\.fromhex|requests\\.|urllib|__import__|b[\\\"'])|def\\s+__reduce__\\b[\\s\\S]{0,200}?(?:os\\.system|os\\.popen|subprocess\\.|__import__\\(\\s*['\\\"]os)|c(?:os|posix|nt|subprocess|_posixsubprocess|__builtin__|builtins|shutil|platform|pty|socket)\\n(?:system|popen[0-9]?|getstatusoutput|call|run|check_output|check_call|Popen|spawn|exec[lv]e?|eval|exec|__import__|remove|unlink|rmtree)|\\x8c[\\x01-\\x20](?:posix|os|nt|subprocess|_posixsubprocess|socket|pty|shutil)\\x94\\x8c[\\x01-\\x20](?:system|popen|exec|spawn|run|Popen|check_output|getstatusoutput|remove|unlink)\\x94\\x93"
+      },
+      "decode": [
+        "base64",
+        "hex"
+      ],
+      "severity": "critical",
+      "action": "block",
+      "refs": [
+        "https://www.reversinglabs.com/blog/rl-identifies-malware-ml-model-hosted-on-hugging-face",
+        "https://docs.python.org/3/library/pickle.html"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM03",
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05",
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0011.000",
+        "AML.T0050"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0005",
+      "title": "torch.load without weights_only=True",
+      "description": "torch.load without weights_only=True unpickles the checkpoint and can run arbitrary code (CVE-2025-32434; PyTorch 2.6 made weights_only=True the default). Pass weights_only=True or load safetensors.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "torch\\.load\\s*\\((?![^)]*weights_only\\s*=\\s*True)"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2025-32434",
+        "https://github.com/pytorch/pytorch/security/advisories/GHSA-53q9-r3pm-6pq6",
+        "https://dev-discuss.pytorch.org/t/bc-breaking-change-torch-load-is-being-flipped-to-use-weights-only-true-by-default-in-the-nightlies-after-137602/2573"
+      ],
+      "cve": [
+        "CVE-2025-32434"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05",
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0011.000",
+        "AML.T0010.003"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0006",
+      "title": "Keras Lambda layer / safe_mode=False model loading",
+      "description": "A Keras model with a Lambda layer, or load_model(..., safe_mode=False), runs embedded Python on load (CVE-2024-3660; CVE-2025-1550 bypasses safe_mode via a crafted config.json). Keep safe_mode=True and do not load untrusted .keras/.h5 models.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "safe_mode\\s*=\\s*False|['\\\"]class_name['\\\"]\\s*:\\s*['\\\"]__lambda__['\\\"]"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://kb.cert.org/vuls/id/253266",
+        "https://nvd.nist.gov/vuln/detail/CVE-2025-1550",
+        "https://keras.io/api/models/model_saving_apis/model_saving_and_loading/"
+      ],
+      "cve": [
+        "CVE-2024-3660",
+        "CVE-2025-1550"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04",
+        "ASI05"
+      ],
+      "atlas": [
+        "AML.T0011.000"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0007",
+      "title": "trust_remote_code=True",
+      "description": "trust_remote_code=True runs model code hosted in the repository on from_pretrained. Prefer a built-in architecture; if unavoidable, pin a reviewed revision and allowlist the source.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "trust_remote_code\\s*=\\s*True"
+      },
+      "decode": [],
+      "severity": "medium",
+      "action": "block",
+      "refs": [
+        "https://huggingface.co/docs/transformers/en/models",
+        "https://huggingface.co/docs/transformers/en/custom_models"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0010.001",
+        "AML.T0011.000"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0008",
+      "title": "Unsafe YAML deserialization (yaml.load without SafeLoader)",
+      "description": "yaml.load without a SafeLoader, yaml.unsafe_load or yaml.full_load can execute arbitrary Python via python/object/new tags (CVE-2017-18342, CVE-2020-14343). Use yaml.safe_load.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "yaml\\.unsafe_load\\s*\\(|yaml\\.full_load\\s*\\(|yaml\\.load\\s*\\((?![^)]*Loader\\s*=\\s*(?:yaml\\.)?C?SafeLoader)|Loader\\s*=\\s*(?:yaml\\.)?(?:UnsafeLoader|FullLoader)\\b"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2017-18342",
+        "https://nvd.nist.gov/vuln/detail/CVE-2020-14343",
+        "https://github.com/yaml/pyyaml/wiki/PyYAML-yaml.load(input)-Deprecation"
+      ],
+      "cve": [
+        "CVE-2017-18342",
+        "CVE-2020-14343"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "atlas": [
+        "AML.T0050"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0009",
+      "title": "Python __import__ in an evaluated expression (LangChain LLMMathChain class)",
+      "description": "__import__('os')/subprocess inside an expression that reaches eval/exec, e.g. the LangChain LLMMathChain prompt-injection-to-RCE (CVE-2023-29374). Do not eval model-produced expressions.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "__import__\\s*\\(\\s*['\\\"](?:os|subprocess|sys|builtins|importlib|pty|socket)['\\\"]\\s*\\)"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2023-29374",
+        "https://github.com/langchain-ai/langchain/issues/814",
+        "https://github.com/langchain-ai/langchain/issues/1026"
+      ],
+      "cve": [
+        "CVE-2023-29374"
+      ],
+      "owasp_llm": [
+        "LLM01",
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "atlas": [
+        "AML.T0051.000",
+        "AML.T0050"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0010",
+      "title": "Ray Jobs API remote code execution (ShadowRay)",
+      "description": "A call to the unauthenticated Ray Jobs API (port 8265 /api/jobs, JobSubmissionClient, ray job submit) runs arbitrary commands on the cluster (CVE-2023-48022, ShadowRay). Do not expose the Ray dashboard; require authentication.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": ":8265/api/jobs|JobSubmissionClient\\b|ray\\s+job\\s+submit\\b"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2023-48022",
+        "https://bishopfox.com/blog/ray-versions-2-6-3-2-8-0",
+        "https://www.oligo.security/blog/shadowray-attack-ai-workloads-actively-exploited-in-the-wild"
+      ],
+      "cve": [
+        "CVE-2023-48022"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI05",
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0049",
+        "AML.T0050"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0011",
+      "title": "Ollama model pull/push with path traversal (Probllama)",
+      "description": "An Ollama /api/pull or /api/push manifest whose digest contains ../ traverses the filesystem and can overwrite files or leak them (CVE-2024-37032, Probllama; fixed in 0.1.34). Only pull models from trusted registries.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": ":11434/api/(?:pull|push)\\b|digest\\\\?['\\\"]\\s*:\\s*\\\\?['\\\"][^'\\\"\\\\]*\\.\\.(?:/|%2f)|(?:\\.\\.[\\\\/]){3,}"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2024-37032",
+        "https://www.wiz.io/blog/probllama-ollama-vulnerability-cve-2024-37032",
+        "https://github.com/ollama/ollama/pull/4175"
+      ],
+      "cve": [
+        "CVE-2024-37032"
+      ],
+      "owasp_llm": [
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04"
+      ],
+      "atlas": [
+        "AML.T0049",
+        "AML.T0010.003"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0012",
+      "title": "SSRF to cloud instance metadata service",
+      "description": "A request to a cloud metadata endpoint (AWS 169.254.169.254 / [fd00:ec2::254], GCP metadata.google.internal, Alibaba 100.100.100.200) can steal instance credentials via SSRF. Block egress to link-local metadata addresses.",
+      "targets": [
+        "input",
+        "output",
+        "tool_args",
+        "tool_result",
+        "tool_definition"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "169\\.254\\.169\\.254|metadata\\.google\\.internal|100\\.100\\.100\\.200|fd00:ec2::254|fd20:ce::254|/latest/meta-data/|/computeMetadata/v1/"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html",
+        "https://docs.cloud.google.com/compute/docs/metadata/querying-metadata",
+        "https://www.alibabacloud.com/help/en/ecs/user-guide/view-instance-metadata"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM05",
+        "LLM02"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "atlas": [
+        "AML.T0075",
+        "AML.T0055"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0013",
+      "title": "Reverse shell or pipe-to-shell command",
+      "description": "A reverse shell (bash -i >& /dev/tcp/, nc -e) or curl|bash / wget|sh install-and-run grants the attacker remote control. Do not execute shell commands produced from untrusted content.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "bash\\s+-i\\b[^\\n]{0,40}/dev/tcp/|/dev/(?:tcp|udp)/\\d{1,3}(?:\\.\\d{1,3}){3}|\\bn(?:c|cat)\\b[^\\n|;&]{0,40}\\s-e\\s*/?(?:bin/)?(?:ba)?sh|(?:curl|wget)\\s+[^\\n|]{1,200}\\|\\s*(?:sudo\\s+)?(?:ba)?sh\\b|socket\\.socket\\([\\s\\S]{0,160}?(?:connect|dup2)\\("
+      },
+      "decode": [],
+      "severity": "critical",
+      "action": "block",
+      "refs": [
+        "https://attack.mitre.org/techniques/T1059/004/"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "atlas": [
+        "AML.T0072",
+        "AML.T0050"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0014",
+      "title": "MCP tool-poisoning instructions in a tool definition",
+      "description": "A tool description with an <IMPORTANT> block or hidden instructions telling the agent to read ~/.ssh/id_rsa or mcp.json and hide it from the user (Invariant Labs tool poisoning). Reject the tool; re-pin definitions.",
+      "targets": [
+        "tool_definition",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "flags": [
+          "s"
+        ],
+        "pattern": "<important>[\\s\\S]{0,500}?(?:\\.ssh|id_rsa|mcp\\.json|\\.aws/credentials|do not (?:tell|mention|inform|report))|(?:~/\\.ssh/id_rsa|\\.cursor/mcp\\.json|/\\.aws/credentials)[\\s\\S]{0,200}?(?:sidenote|do not (?:tell|mention|inform)|without (?:telling|informing)|do not report)|do not (?:tell|mention|inform)[\\s\\S]{0,60}?(?:the )?user[\\s\\S]{0,200}?(?:id_rsa|mcp\\.json|\\.ssh)"
+      },
+      "decode": [],
+      "severity": "critical",
+      "action": "block",
+      "refs": [
+        "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM01",
+        "LLM03"
+      ],
+      "owasp_agentic": [
+        "ASI04",
+        "ASI06"
+      ],
+      "atlas": [
+        "AML.T0051.001",
+        "AML.T0011.002",
+        "AML.T0055"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0015",
+      "title": "Hidden BCC/CC recipient in mail tool arguments",
+      "description": "Mail tool arguments carry a bcc or cc recipient, the channel used by the malicious postmark-mcp package to copy every email to the attacker. Confirm the hidden recipient is expected; tool_governance can block it outright.",
+      "targets": [
+        "tool_args"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "['\\\"](?:bcc|cc)['\\\"]\\s*:\\s*(?:['\\\"][^'\\\"]*@[^'\\\"]*['\\\"]|\\[[^\\]]*@)"
+      },
+      "decode": [],
+      "severity": "medium",
+      "action": "log",
+      "refs": [
+        "https://www.koi.ai/blog/postmark-mcp-npm-malicious-backdoor-email-theft"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM02",
+        "LLM06"
+      ],
+      "owasp_agentic": [
+        "ASI02"
+      ],
+      "atlas": [
+        "AML.T0086",
+        "AML.T0011.002"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0016",
+      "title": "Policy Puppetry fake configuration block",
+      "description": "A fake policy/config block (<interaction-config>, <blocked-modes>, <allowed-responses>) tries to override the model's guardrails by imitating system configuration (HiddenLayer Policy Puppetry). Treat it as a jailbreak attempt.",
+      "targets": [
+        "input",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "</?interaction-config>|<\\s*interaction-config\\b|<blocked-modes>|<allowed-responses>|<blocked-strings>|<\\s*request\\s+interaction-mode\\s*="
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://hiddenlayer.com/innovation-hub/novel-universal-bypass-for-all-major-llms/"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "atlas": [
+        "AML.T0054",
+        "AML.T0051.000"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0017",
+      "title": "DAN / developer-mode / Skeleton Key jailbreak",
+      "description": "Known jailbreak framings: DAN ('do anything now'), 'developer mode enabled', or Skeleton Key ('safe educational context ... update your behavior'). Refuse the role-play that removes guardrails.",
+      "targets": [
+        "input",
+        "tool_result"
+      ],
+      "match": {
+        "type": "regex",
+        "pattern": "\\bdo anything now\\b|\\bDAN mode\\b|\\byou are (?:now )?DAN\\b|(?:enable|activate|entering?) (?:developer|dev) mode|developer mode (?:enabled|output|is on)|\\bskeleton key\\b|this is a safe (?:educational|fictional|research) (?:context|environment|setting)[\\s\\S]{0,160}?(?:researchers|ethics|uncensored|warning)"
+      },
+      "decode": [],
+      "severity": "high",
+      "action": "block",
+      "refs": [
+        "https://arxiv.org/abs/2308.03825",
+        "https://www.microsoft.com/en-us/security/blog/2024/06/26/mitigating-skeleton-key-a-new-type-of-generative-ai-jailbreak-technique/"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "atlas": [
+        "AML.T0054"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0018",
+      "title": "Many-shot jailbreak (many faux dialogue turns)",
+      "description": "A single message stuffed with many fabricated User/Assistant turns conditions the model to comply with a final harmful request (Anthropic many-shot jailbreaking). Treat a message full of faux turns as an attack.",
+      "targets": [
+        "input",
+        "tool_result"
+      ],
+      "match": {
+        "type": "structural",
+        "pattern": "many_shot",
+        "threshold": 6
+      },
+      "decode": [],
+      "severity": "medium",
+      "action": "block",
+      "refs": [
+        "https://www.anthropic.com/research/many-shot-jailbreaking"
+      ],
+      "cve": [],
+      "owasp_llm": [
+        "LLM01"
+      ],
+      "owasp_agentic": [
+        "ASI01"
+      ],
+      "atlas": [
+        "AML.T0054"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0019",
+      "title": "Jinja2 / template SSTI payload",
+      "description": "A server-side template injection payload walking Python internals (__class__/__subclasses__/__globals__/__builtins__ to os.popen). Seen in malicious GGUF chat templates (CVE-2024-34359, llama-cpp-python). Render templates in a sandbox; do not load untrusted model metadata.",
+      "targets": [
+        "input",
+        "tool_args",
+        "tool_result",
+        "tool_definition"
+      ],
+      "match": {
+        "type": "regex",
+        "flags": [
+          "s"
+        ],
+        "pattern": "__class__[\\s\\S]{0,40}?__(?:mro|base|subclasses)__|__subclasses__\\s*\\(\\s*\\)|__globals__\\s*\\[|__builtins__[\\s\\S]{0,20}?__import__|\\{\\{[\\s\\S]{0,200}?(?:__subclasses__|__globals__|__import__|os\\.popen|os\\.system|cycler|lipsum|config\\.items)[\\s\\S]{0,80}?\\}\\}|\\{%[\\s\\S]{0,300}?(?:__subclasses__|__builtins__|__import__|os\\.popen|os\\.system)[\\s\\S]{0,80}?%\\}"
+      },
+      "decode": [],
+      "severity": "critical",
+      "action": "block",
+      "refs": [
+        "https://nvd.nist.gov/vuln/detail/CVE-2024-34359",
+        "https://github.com/abetlen/llama-cpp-python/security/advisories/GHSA-56xg-wfcc-g829"
+      ],
+      "cve": [
+        "CVE-2024-34359"
+      ],
+      "owasp_llm": [
+        "LLM03",
+        "LLM05"
+      ],
+      "owasp_agentic": [
+        "ASI05"
+      ],
+      "atlas": [
+        "AML.T0011.000",
+        "AML.T0050"
+      ],
+      "added": "2026-10-04"
+    },
+    {
+      "id": "SIG-0020",
+      "title": "EICAR anti-malware test string",
+      "description": "The standard EICAR test string. It is harmless and exists only to confirm that the content scanner is active end to end; a real deployment keeps it to verify the feed is wired up.",
+      "targets": [
+        "input",
+        "output",
+        "tool_args",
+        "tool_result"
+      ],
+      "match": {
+        "type": "sha256",
+        "value": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
+      },
+      "decode": [
+        "base64"
+      ],
+      "severity": "medium",
+      "action": "log",
+      "refs": [
+        "https://www.eicar.org/download-anti-malware-testfile/"
+      ],
+      "cve": [],
+      "owasp_llm": [],
+      "owasp_agentic": [],
+      "atlas": [],
+      "added": "2026-10-04"
+    }
+  ]
+}

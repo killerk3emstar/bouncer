@@ -416,6 +416,13 @@ class Engine:
         ctx.findings.extend(findings)
         return self._decision(ctx, findings, action, phase="input")
 
+    def _judge_enabled(self, ctx: RequestCtx) -> bool:
+        """The judge is off when the policy says backend: none or the gateway overrides it to none."""
+        if self.judge is None:
+            return False
+        backend = getattr(self.judge, "backend", None) or ctx.doc.judge.backend
+        return backend != "none"
+
     def _enforced_block(self, ctx: RequestCtx, findings: list[Finding]) -> bool:
         """True when some finding will block regardless of later layers (not monitor, not permissive-capped)."""
         for f in findings:
@@ -523,8 +530,9 @@ class Engine:
 
     async def _judge_injection(self, ctx: RequestCtx, escalate: list[tuple[Segment, str, str, float | None]], pi: Any) -> list[Finding]:
         out: list[Finding] = []
-        q = ctx.doc.judge.questions.get("injection")
-        if self.judge is None or ctx.doc.judge.backend == "none" or q is None or not pi.judge.enabled:
+        questions = ctx.doc.judge.questions
+        q = questions.get("injection")
+        if not self._judge_enabled(ctx) or q is None or not pi.judge.enabled:
             for seg, _clean, reason, score in escalate:
                 out.append(
                     self._finding(
@@ -543,15 +551,22 @@ class Engine:
             return out
         ctx.escalated = True
         for seg, clean, reason, _score in escalate:
-            # Clef latency grows with input length (measured 2.0 s at ~300 tokens, 4.1 s at ~1000 on M4 Pro)
-            state = {"USER_REQUEST": _clip(ctx.user_request, 600), "UNTRUSTED_CONTENT": _clip(clean, 2000)}
-            res = await self._judge_call(ctx, state, {"injection": q.model_dump(exclude_none=True)}, reason)
+            # Clef latency grows with input length (measured 2.0 s at ~300 tokens, 4.1 s at ~1000 on M4 Pro).
+            # A user message is a direct attack candidate (jailbreak question); anything else is untrusted
+            # content that may carry instructions (injection question).
+            if seg.role == "user" and "jailbreak" in questions:
+                qid = "jailbreak"
+                state = {"USER_MESSAGE": _clip(clean, 2000)}
+            else:
+                qid = "injection"
+                state = {"USER_REQUEST": _clip(ctx.user_request, 600), "UNTRUSTED_CONTENT": _clip(clean, 2000)}
+            res = await self._judge_call(ctx, state, {qid: questions[qid].model_dump(exclude_none=True)}, reason)
             if res is None:
                 continue
             if res.get("error"):
                 out.append(self._judge_failure(ctx, "prompt_injection", res["error"], seg))
                 continue
-            p_yes = float(((res.get("answers") or {}).get("injection") or {}).get("yes", 0.0))
+            p_yes = float(((res.get("answers") or {}).get(qid) or {}).get("yes", 0.0))
             if p_yes >= pi.judge.block_above:
                 act, verb = Action.BLOCK, "blocked"
             elif p_yes >= pi.judge.approval_above:
@@ -563,7 +578,8 @@ class Engine:
                     "prompt_injection",
                     "judge",
                     act,
-                    f"T2 judge ({res.get('backend')}) rated {describe_source(seg.source)} as an injection attempt with p={p_yes:.2f} "
+                    f"T2 judge ({res.get('backend')}) rated {describe_source(seg.source)} as "
+                    f"{'an attempt to bypass the assistant rules or extract its instructions' if qid == 'jailbreak' else 'an injection attempt'} with p={p_yes:.2f} "
                     f"(escalated: {reason}); {verb}. Review the content source before letting the agent act on it.",
                     tier="T2",
                     severity="high",
@@ -802,7 +818,7 @@ class Engine:
     async def _goal_alignment(self, ctx: RequestCtx, tg: Any, name: str, args: Any) -> list[Finding]:
         jc = ctx.doc.judge
         qs = {k: v.model_dump(exclude_none=True) for k, v in jc.questions.items() if k in ("goal_alignment", "exfiltration")}
-        if self.judge is None or jc.backend == "none" or not qs:
+        if not self._judge_enabled(ctx) or not qs:
             return []
         ctx.escalated = True
         untrusted = self._recent_untrusted(ctx)
