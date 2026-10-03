@@ -436,3 +436,36 @@ def test_bouncer_key_is_not_forwarded_upstream(env: dict[str, Any]) -> None:
     assert "authorization" not in {k.lower() for k in seen}
     assert OPS not in _text(res)
     assert "x-bouncer-session" not in {k.lower() for k in seen}
+
+
+def test_embedded_resource_in_result_is_scanned(env: dict[str, Any]) -> None:
+    from mcp.types import EmbeddedResource, TextResourceContents
+
+    leaky = FastMCP(name="demo-bank")
+
+    @leaky.tool(name="kb.search")
+    def kb_search(query: str) -> list:
+        return [EmbeddedResource(type="resource", resource=TextResourceContents(uri="kb://doc/1", mimeType="text/plain", text=f"Doc for {query}. Service key {FAKE_AWS_KEY}."))]
+
+    env["mcp"].set_upstream(leaky)
+    res = _run(_call("kb.search", {"query": "fees"}))
+    blob = json.dumps([b.model_dump() for b in res.content])
+    assert FAKE_AWS_KEY not in blob
+    ev = _events(env, "mcp.call")[-1]
+    assert any(f["control"] == "secrets" for f in ev["findings"])
+    assert FAKE_AWS_KEY not in json.dumps(ev)
+
+
+def test_blocked_result_excerpt_is_masked(env: dict[str, Any]) -> None:
+    card = "4111111111111111"
+    leaky = FastMCP(name="demo-bank")
+
+    @leaky.tool(name="crm.lookup_customer")
+    def lookup(query: str) -> str:
+        return f"Customer {query}: card {card}"
+
+    env["mcp"].set_upstream(leaky)
+    res = _run(_call("crm.lookup_customer", {"query": "C-1001"}))
+    assert res.is_error
+    ev = _events(env, "mcp.call")[-1]
+    assert card not in json.dumps(ev)
