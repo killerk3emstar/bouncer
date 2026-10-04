@@ -103,6 +103,9 @@ def main() -> None:
     ap.add_argument("--gateway", help="URL of a running Bouncer gateway (default: in-process)")
     args = ap.parse_args()
     if args.gateway:
+        from dotenv import load_dotenv
+
+        load_dotenv(override=False)  # agent keys from .env, like make demo
         live(args.gateway)
     else:
         in_process()
