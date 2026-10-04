@@ -440,3 +440,34 @@ def test_audit_exports_follow_the_contract(tmp_path: Path) -> None:
     assert asyncio.run(get("/api/export/audit.csv?from=2000-01-01T00:00:00Z&to=2000-01-02T00:00:00Z")).text.count("\r\n") == 1
     bad = asyncio.run(get("/api/export/audit.jsonl?from=yesterday"))
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "export.bad_timestamp"
+
+
+
+def test_policy_reload_is_a_system_event_in_events_and_audit(tmp_path: Path) -> None:
+    os.environ["BOUNCER_KEY_OPS_COPILOT"] = KEY
+    policy = tmp_path / "bouncer.yaml"
+    shutil.copy("policy/bouncer.yaml", policy)
+    app = create_app(
+        Settings(policy_path=str(policy), audit_path=str(tmp_path / "a.jsonl"), t1="fake", judge_override="fake", watch=False, admin_token="adm_test_token"),
+        upstream_transport=httpx.ASGITransport(app=create_mock(MockState())),
+    )
+    g = app.state.gw
+    policy.write_text(policy.read_text().replace("EMAIL: redact", "EMAIL: block", 1))
+    assert g.policies.reload()
+    policy.write_text("defaults: [not, a, mapping")
+    assert not g.policies.reload()
+
+    async def get(path: str) -> httpx.Response:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.get(path, headers={"Authorization": "Bearer adm_test_token"})
+
+    evs = asyncio.run(get("/api/events")).json()["events"]
+    kinds = [e["type"] for e in evs]
+    assert kinds[:2] == ["policy.reload_failed", "policy.reloaded"]
+    failed, ok = evs[0], evs[1]
+    assert ok["principal"] == {"id": "system", "team": None} and ok["route"] == "admin" and ok["trace_id"].startswith("tr_")
+    assert ok["message"].startswith("Policy reloaded:") and ok["action"] == "allow"
+    assert failed["action"] == "block" and "previous version stays active" in failed["message"]
+    assert asyncio.run(get(f"/api/events/{ok['trace_id']}")).status_code == 200
+    # stats and the Overview count decisions only
+    assert asyncio.run(get("/api/stats")).json()["totals"]["requests"] == 0

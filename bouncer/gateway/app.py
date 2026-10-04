@@ -19,7 +19,7 @@ from prometheus_client import generate_latest
 from bouncer.audit import AuditLog
 from bouncer.gateway import guard_api, openai_proxy
 from bouncer.gateway.state import GatewayState, JudgeAdapter, Settings, build_classifier, build_lang_detector
-from bouncer.pipeline import Engine
+from bouncer.pipeline import Engine, new_trace_id
 from bouncer.policy.loader import PolicyManager
 from bouncer.store import Store
 from bouncer.telemetry import Telemetry
@@ -42,14 +42,18 @@ def build_state(
 
     def on_policy_event(kind: str, data: dict[str, Any]) -> None:
         telemetry.policy_reloads.labels("ok" if kind == "policy.reloaded" else "failed").inc()
-        audit = holder.get("audit")
-        if audit is not None:
-            audit.write({"type": kind, "trace_id": None, "route": "admin", **data})
+        if kind == "policy.reloaded":
+            message = f"Policy reloaded: {str(data.get('from_version'))[:19]} -> {str(data.get('to_version'))[:19]}."
+        else:
+            err = data.get("message") or data.get("error") or "invalid policy file"
+            message = f"Policy file rejected, the previous version stays active: {err}"
+        write_system_event(holder, kind, {**data, "message": message})
 
     policies = PolicyManager(settings.policy_path, shared=shared, on_event=on_policy_event)
     policy = policies.load_initial()
     audit = AuditLog(settings.audit_path or policy.doc.audit.path, policy.doc.audit.hash_chain)
     holder["audit"] = audit
+    holder["policies"] = policies
     store = Store()
     store.replay_spend(audit.events)  # daily budgets survive a gateway restart
     clf = build_classifier(settings) if classifier == "default" else classifier
@@ -73,6 +77,29 @@ def build_state(
     return gw_state
 
 
+def write_system_event(holder: dict[str, Any], kind: str, data: dict[str, Any]) -> None:
+    """Audit event for a change of the gateway itself (docs/API.md 3: route admin, principal system)."""
+    audit = holder.get("audit")
+    if audit is None:
+        return
+    policies = holder.get("policies")
+    current = getattr(policies, "_current", None) if policies is not None else None
+    doc = getattr(current, "doc", None)
+    audit.write({
+        "type": kind,
+        "trace_id": new_trace_id(),
+        "principal": {"id": "system", "team": None},
+        "route": "admin",
+        "direction": None,
+        "model": None,
+        "status_code": None,
+        "action": "block" if kind in ("policy.reload_failed", "feed.rejected") else "allow",
+        "findings": [],
+        "policy": {"version": current.version, "profile": doc.profile, "mode": doc.defaults.mode} if current is not None and doc is not None else None,
+        **data,
+    })
+
+
 def _share_feed_store(g: GatewayState) -> None:
     """Keep one signature feed store across policy reloads (so feed state and hit counters survive)."""
     sig = g.policies.current.variant().controls.get("signatures")
@@ -80,6 +107,9 @@ def _share_feed_store(g: GatewayState) -> None:
     if store is not None:
         g.policies.shared["feed_store"] = store
         g.feed_store = store
+        if store.on_event is None:
+            holder = {"audit": g.audit, "policies": g.policies}
+            store.on_event = lambda kind, data: write_system_event(holder, kind, data)
 
 
 def create_app(

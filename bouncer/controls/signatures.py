@@ -259,6 +259,8 @@ class FeedStore:
         self.last_check: float = 0.0
         self._last_mtime: float = 0.0
         self.hits: dict[str, dict[str, Any]] = {}  # signature id -> {count, last_hit, times}
+        # audit hook, set by the gateway: on_event("feed.updated" | "feed.rejected", details)
+        self.on_event: Any = None
 
         try:
             self._load()
@@ -378,6 +380,7 @@ class FeedStore:
             source=source,
         )
         with self._lock:
+            previous = self.active
             self.active = active
             self.last_error = None
             for sig in compiled:
@@ -389,7 +392,39 @@ class FeedStore:
             len(compiled),
             verified,
         )
+        if previous is not None:
+            self._emit("feed.updated", {
+                "message": f"Signature feed {model.feed} updated from version {previous.model.version} to {model.version} "
+                f"({len(previous.compiled)} -> {len(compiled)} signatures, signature {'verified' if verified else 'not verified'}).",
+                "feed": {"name": model.feed, "from_version": previous.model.version, "to_version": model.version,
+                         "signatures": len(compiled), "verified": verified, "sha256": raw_sha, "source": source},
+            })
         return True
+
+    def _emit(self, kind: str, data: dict[str, Any]) -> None:
+        if self.on_event is None:
+            return
+        try:
+            self.on_event(kind, data)
+        except Exception:
+            log.exception("could not record %s in the audit log", kind)
+
+    def _rejected(self, error: str) -> None:
+        """Record a rejected update once per distinct error (the same bad file is re-checked every refresh)."""
+        with self._lock:
+            repeat = error == self.last_error
+            self.last_error = error
+            self.last_error_at = time.time()
+            active = self.active
+        if repeat:
+            return
+        version = active.model.version if active else None
+        self._emit("feed.rejected", {
+            "message": f"Signature feed update rejected: {error}. The previous feed stays active"
+            + (f" (version {version})." if version is not None else ".")
+            + " Check the feed file and its .sig signature, then sign it again with make sign-feed.",
+            "feed": {"name": active.model.feed if active else None, "active_version": version, "source": self.feed, "error": error},
+        })
 
     # ---------------------------------------------------------------- refresh / status
 
@@ -413,15 +448,11 @@ class FeedStore:
         try:
             return self._load()
         except FeedVerifyError as exc:
-            with self._lock:
-                self.last_error = str(exc)
-                self.last_error_at = time.time()
+            self._rejected(str(exc))
             log.warning("signature feed update rejected, keeping previous version: %s", exc)
             return False
         except Exception as exc:  # network / IO
-            with self._lock:
-                self.last_error = f"{type(exc).__name__}: {exc}"
-                self.last_error_at = time.time()
+            self._rejected(f"{type(exc).__name__}: {exc}")
             self.last_check = now
             log.warning("signature feed refresh failed, keeping previous version: %s", exc)
             return False

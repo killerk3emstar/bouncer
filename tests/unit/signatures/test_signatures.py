@@ -322,3 +322,46 @@ def test_rollback_to_older_signed_feed_is_refused(tmp_path: Path, record_propert
     store.maybe_refresh()
     assert store.active.version == 5 and len(store.active.compiled) == len(doc["signatures"])
     assert "rollback" in (store.last_error or "")
+
+
+def test_feed_changes_are_reported_for_the_audit_log(tmp_path: Path, record_property):  # noqa: ANN001
+    # feed.updated for a new signed version, feed.rejected once per distinct bad update (docs/API.md 3)
+    record_property("kind", "block")
+    import os
+    import time as _t
+
+    from nacl.signing import SigningKey
+
+    sk = SigningKey.generate()
+    feed = tmp_path / "feed.json"
+    pub = tmp_path / "feed.pub"
+    pub.write_text(base64.b64encode(bytes(sk.verify_key)).decode())
+
+    def write(doc: dict, sign: bool = True) -> None:
+        body = (json.dumps(doc, indent=2) + "\n").encode()
+        feed.write_bytes(body)
+        if sign:
+            (tmp_path / "feed.json.sig").write_text(base64.b64encode(sk.sign(body).signature).decode())
+        bump = _t.time() + 5 + len(events)
+        os.utime(feed, (bump, bump))
+
+    events: list[tuple[str, dict]] = []
+    doc = json.loads(FEED.read_text())
+    doc["version"] = 1
+    write(doc)
+    store = FeedStore(feed=str(feed), public_key=str(pub), require_signature=True, refresh_seconds=1)
+    store.on_event = lambda kind, data: events.append((kind, data))
+
+    doc["version"] = 2
+    write(doc)
+    assert store.maybe_refresh() is True
+    doc["version"] = 3
+    write(doc, sign=False)  # stale signature
+    store.maybe_refresh()
+    store._last_mtime = 0.0  # the same bad file checked again: no second event
+    store.maybe_refresh()
+
+    assert [k for k, _ in events] == ["feed.updated", "feed.rejected"]
+    assert events[0][1]["feed"]["from_version"] == 1 and events[0][1]["feed"]["to_version"] == 2
+    assert "previous feed stays active (version 2)" in events[1][1]["message"]
+    assert store.active is not None and store.active.version == 2

@@ -23,8 +23,10 @@ Not implemented as specified here (open items):
   spreadsheet does not run them as formulas. An invalid `from` / `to` is a 422 with code `export.bad_timestamp`.
 - **Self-test.** No 409 for a second concurrent run; `report_url` is always `null`; `by_control` lists only
   controls that have cases.
-- **System events.** `feed.updated` and `feed.rejected` are not written. `/api/events` and the SSE stream return
-  decision events only. `approval.decided` carries the trace id of the held request and the agent as `principal`.
+- **System events.** `approval.decided` carries the trace id of the held request and the agent as `principal`;
+  the other system events (`policy.reloaded`, `policy.reload_failed`, `feed.updated`, `feed.rejected`) use
+  `principal: {"id": "system"}` and `action` `allow` (applied) or `block` (rejected, previous version stays). A feed
+  update rejected for the same reason again is recorded once.
 - **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_tool`; `monitor_async` is never
   emitted.
 - **Budgets.** `state` is `ok`, `warning`, `downgraded` (spent; paid requests go to the local model) or `blocked`.

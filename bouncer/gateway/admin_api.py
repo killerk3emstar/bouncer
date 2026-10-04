@@ -228,7 +228,8 @@ def _filter_params(request: Request) -> dict[str, Any]:
 async def events(request: Request, limit: int = 100, before_seq: int | None = None) -> dict[str, Any]:
     g = gw(request)
     limit = max(1, min(limit, 1000))
-    evs = g.audit.query(limit=limit + 1, before_seq=before_seq, kind="decision", **_filter_params(request))
+    # decisions and system events (policy reloads, feed updates, approval decisions), newest first
+    evs = g.audit.query(limit=limit + 1, before_seq=before_seq, kind=None, **_filter_params(request))
     nxt = evs[limit - 1]["seq"] if len(evs) > limit else None
     return {"events": evs[:limit], "next_before_seq": nxt}
 
@@ -248,8 +249,6 @@ async def events_stream(request: Request) -> StreamingResponse:
                     ev = await asyncio.wait_for(q.get(), timeout=15)
                 except TimeoutError:
                     yield ": keepalive\n\n"
-                    continue
-                if ev.get("type", "decision") != "decision":
                     continue
                 yield f"data: {json.dumps(ev, ensure_ascii=False, default=str)}\n\n"
         finally:

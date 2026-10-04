@@ -127,7 +127,7 @@ function eventSection(e, idx, total) {
       ${timeEl(e.ts, { ms: true, date: true })}
     </header>
     ${e.message ? html`<div class="notice ${e.action === 'block' ? 'notice-error' : e.action === 'require_approval' ? 'notice-approval' : 'notice-info'}">
-      <div class="notice-label">Message returned to the agent${isNum(e.status_code) ? ` (HTTP ${e.status_code})` : ''}</div>${e.message}
+      <div class="notice-label">${kind ? 'System event' : 'Message returned to the agent'}${isNum(e.status_code) ? ` (HTTP ${e.status_code})` : ''}</div>${e.message}
       ${e.approval_id ? html`<div><a href="#/approvals">Open approval ${e.approval_id}</a></div>` : ''}</div>` : ''}
     <dl class="facts facts-inline">
       <div><dt>Principal</dt><dd>${principalLabel(e.principal)}</dd></div>
