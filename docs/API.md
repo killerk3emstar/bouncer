@@ -15,7 +15,7 @@ Contents: 0 Differences in this build · 1 Conventions · 2 Serving the dashboar
 Checked on 2026-10-04 against `bouncer/gateway/admin_api.py`, `bouncer/pipeline.py`, `bouncer/audit.py` and the GET
 endpoints of a running gateway.
 
-Not implemented as specified here (open items):
+Differences from the specification below, and details it does not cover:
 
 - **Approvals.** `decided_by` is `dashboard`. `status` can also be `used` (the approved call went through once;
   an approval is single-use and bound to the agent and session of the held call).
