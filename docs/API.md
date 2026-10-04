@@ -19,11 +19,8 @@ Not implemented as specified here (open items):
 
 - **Approvals.** `decided_by` is `dashboard`. `status` can also be `used` (the approved call went through once;
   an approval is single-use and bound to the agent and session of the held call).
-- **Exports.** `from` and `to` are ignored; the export reads the in-memory buffer of the last 5000 events, not the
-  whole file. The file name is `bouncer-audit.jsonl` / `bouncer-audit.csv`. The CSV has 16 columns:
-  `ts,seq,trace_id,principal,team,session_id,route,direction,model,action,findings,latency_ms_total,cost_usd,policy_version,excerpt,hash`
-  (the dashboard's fixture exporter still writes the 26 columns of section 5). Cells that start with `=`, `+`,
-  `-`, `@`, tab or carriage return get a leading `'` so a spreadsheet does not run them as formulas.
+- **Exports.** CSV cells that start with `=`, `+`, `-`, `@`, tab or carriage return get a leading `'` so a
+  spreadsheet does not run them as formulas. An invalid `from` / `to` is a 422 with code `export.bad_timestamp`.
 - **Self-test.** No 409 for a second concurrent run; `report_url` is always `null`; `by_control` lists only
   controls that have cases.
 - **System events.** `feed.updated` and `feed.rejected` are not written. `/api/events` and the SSE stream return

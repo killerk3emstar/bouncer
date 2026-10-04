@@ -10,16 +10,17 @@ import asyncio
 import json
 import time
 from collections import Counter, defaultdict
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from bouncer.audit import event_epoch, now_iso, to_csv
+from bouncer.audit import csv_header, csv_line, event_epoch, now_iso
 from bouncer.gateway.openai_proxy import gw, handle_chat
 from bouncer.policy.compiled import CONTROL_CATALOG
 from bouncer.policy.profiles import PROFILE_NOTES
@@ -1028,19 +1029,53 @@ async def selftest(request: Request) -> dict[str, Any]:
 # ---------------------------------------------------------------------------- exports and report
 
 
+def _export_filters(request: Request) -> dict[str, Any]:
+    """Events-view filters plus optional from/to (ISO timestamps) for the exports."""
+    q = request.query_params
+    out: dict[str, Any] = {**_filter_params(request), "since_ts": None, "until_ts": None}
+    for key, target in (("from", "since_ts"), ("to", "until_ts")):
+        if q.get(key):
+            out[target] = event_epoch({"ts": q[key].replace("Z", "+00:00")})
+            if not out[target]:
+                raise ValueError(f"'{key}' must be an ISO 8601 timestamp, for example 2026-10-04T08:00:00Z.")
+    return out
+
+
+def _bad_export(exc: ValueError) -> JSONResponse:
+    return JSONResponse({"error": {"type": "invalid_request", "code": "export.bad_timestamp", "message": str(exc)}}, status_code=422)
+
+
+def _export_name(ext: str) -> str:
+    return f"bouncer-audit-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.{ext}"
+
+
 @router.get("/api/export/audit.jsonl")
-async def export_jsonl(request: Request, limit: int = 100000) -> PlainTextResponse:
+async def export_jsonl(request: Request) -> Any:
+    """The whole matching log, oldest first, lines unchanged (an unfiltered export passes make verify-audit)."""
     g = gw(request)
-    evs = list(reversed(g.audit.query(limit=limit, kind=None, **_filter_params(request))))
-    body = "".join(json.dumps(e, ensure_ascii=False, default=str) + "\n" for e in evs)
-    return PlainTextResponse(body, media_type="application/x-ndjson", headers={"Content-Disposition": "attachment; filename=bouncer-audit.jsonl"})
+    try:
+        filters = _export_filters(request)
+    except ValueError as exc:
+        return _bad_export(exc)
+    lines = (line for line, _ in g.audit.export(**filters))
+    return StreamingResponse(lines, media_type="application/x-ndjson", headers={"Content-Disposition": f'attachment; filename="{_export_name("jsonl")}"'})
 
 
 @router.get("/api/export/audit.csv")
-async def export_csv(request: Request, limit: int = 100000) -> PlainTextResponse:
+async def export_csv(request: Request) -> Any:
+    """The whole matching log as CSV with the columns of docs/API.md section 5."""
     g = gw(request)
-    evs = list(reversed(g.audit.query(limit=limit, kind="decision", **_filter_params(request))))
-    return PlainTextResponse(to_csv(evs), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=bouncer-audit.csv"})
+    try:
+        filters = _export_filters(request)
+    except ValueError as exc:
+        return _bad_export(exc)
+
+    def body() -> Iterator[str]:
+        yield csv_header()
+        for _, ev in g.audit.export(**filters):
+            yield csv_line(ev)
+
+    return StreamingResponse(body(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{_export_name("csv")}"'})
 
 
 @router.get("/reports/summary")

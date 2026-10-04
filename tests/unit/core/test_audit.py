@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from pathlib import Path
 
-from bouncer.audit import AuditLog, to_csv, verify_file
+from bouncer.audit import CSV_FIELDS, AuditLog, event_epoch, to_csv, verify_file
 
 
 def _write(path: Path, n: int = 5) -> AuditLog:
@@ -101,3 +103,44 @@ def test_removed_tail_lines_are_detected(tmp_path: Path) -> None:
     p.write_text("\n".join(lines[:3]) + "\n")
     res = verify_file(p)
     assert not res["ok"] and "removed from the end" in res["error"]
+
+
+def test_export_reads_the_whole_file_oldest_first_with_unchanged_lines(tmp_path: Path) -> None:
+    p = tmp_path / "audit.jsonl"
+    log = AuditLog(p, memory_size=3)  # the in-memory buffer keeps 3 events, the file has 8
+    for i in range(8):
+        log.write({"type": "decision", "trace_id": f"tr_{i}", "action": "block" if i % 2 else "allow", "findings": []})
+    lines = [line for line, _ in log.export()]
+    assert len(lines) == 8 and lines == p.read_text().splitlines(keepends=True)
+    out = tmp_path / "export.jsonl"
+    out.write_text("".join(lines))
+    assert verify_file(out)["ok"]  # an unfiltered export verifies like the log itself
+    assert [ev["trace_id"] for _, ev in log.export(action="block")] == ["tr_1", "tr_3", "tr_5", "tr_7"]
+
+
+def test_export_time_window(tmp_path: Path) -> None:
+    log = AuditLog(tmp_path / "audit.jsonl")
+    for i, ts in enumerate(["2026-10-04T06:00:00.000Z", "2026-10-04T07:00:00.000Z", "2026-10-04T08:00:00.000Z"]):
+        log.write({"ts": ts, "type": "decision", "trace_id": f"tr_{i}", "findings": []})
+    since, until = event_epoch({"ts": "2026-10-04T06:30:00+00:00"}), event_epoch({"ts": "2026-10-04T07:30:00+00:00"})
+    assert [ev["trace_id"] for _, ev in log.export(since_ts=since, until_ts=until)] == ["tr_1"]
+
+
+def test_csv_has_the_contract_columns(tmp_path: Path) -> None:
+    log = AuditLog(tmp_path / "a.jsonl")
+    log.write({
+        "type": "decision", "trace_id": "a", "action": "block", "enforced": True, "status_code": 403,
+        "principal": {"id": "ops-copilot", "team": "operations"}, "judge": {"invoked": False},
+        "latency_ms": {"total": 5.0, "gateway_overhead": 4.0}, "findings": [
+            {"id": "pii.EMAIL", "action": "redact", "severity": "medium", "score": 1.0, "owasp_llm": ["LLM02"]},
+            {"id": "secrets.jwt", "action": "block", "severity": "high", "score": 0.9, "owasp_llm": ["LLM02"], "owasp_agentic": ["ASI03"]},
+        ],
+    })
+    text = to_csv(log.query())
+    assert "\r\n" in text
+    rows = list(csv.DictReader(io.StringIO(text)))
+    assert list(rows[0]) == CSV_FIELDS and len(CSV_FIELDS) == 26
+    r = rows[0]
+    assert r["top_finding"] == "secrets.jwt" and r["findings"] == "pii.EMAIL;secrets.jwt"
+    assert r["owasp"] == "ASI03;LLM02" and r["enforced"] == "true" and r["judge_invoked"] == "false"
+    assert r["team"] == "operations" and r["gateway_overhead_ms"] == "4.0" and r["approval_id"] == ""

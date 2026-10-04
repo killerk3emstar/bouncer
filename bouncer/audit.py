@@ -16,6 +16,7 @@ import os
 import threading
 import time
 from collections import deque
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -150,71 +151,153 @@ class AuditLog:
         kind: str | None = "decision",
     ) -> list[dict[str, Any]]:
         out = []
-        ql = q.lower() if q else None
         for ev in reversed(self.events):
-            if kind and ev.get("type", "decision") != kind:
-                continue
             if before_seq is not None and ev.get("seq", 0) >= before_seq:
                 continue
-            if since_ts is not None and event_epoch(ev) < since_ts:
-                continue
-            if action and ev.get("action") != action:
-                continue
-            if principal and (ev.get("principal") or {}).get("id") != principal:
-                continue
-            if route and ev.get("route") != route:
-                continue
-            if control and not any(
-                f.get("control") == control or f.get("id", "").startswith(control) for f in ev.get("findings", [])
-            ):
-                continue
-            if ql and ql not in json.dumps(ev, ensure_ascii=False, default=str).lower():
+            if not matches(ev, action=action, control=control, principal=principal, route=route, q=q, since_ts=since_ts, kind=kind):
                 continue
             out.append(ev)
             if len(out) >= limit:
                 break
         return out
 
+    def export(self, until_ts: float | None = None, **filters: Any) -> Iterator[tuple[str, dict[str, Any]]]:
+        """(line, event) pairs of the whole log, oldest first, that match the filters of query().
 
+        Reads the file, not the in-memory buffer, so an export covers the full history; the line is
+        returned unchanged so that an unfiltered JSONL export still passes `make verify-audit`.
+        """
+        if self.path and self.path.exists():
+            with self.path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if matches(ev, until_ts=until_ts, **filters):
+                        yield (line if line.endswith("\n") else line + "\n"), ev
+            return
+        for ev in list(self.events):
+            if matches(ev, until_ts=until_ts, **filters):
+                yield json.dumps(ev, ensure_ascii=False, default=str) + "\n", ev
+
+
+def matches(
+    ev: dict[str, Any],
+    action: str | None = None,
+    control: str | None = None,
+    principal: str | None = None,
+    route: str | None = None,
+    q: str | None = None,
+    since_ts: float | None = None,
+    until_ts: float | None = None,
+    kind: str | None = None,
+) -> bool:
+    """The event filters of the Events view and the exports."""
+    if kind and ev.get("type", "decision") != kind:
+        return False
+    if since_ts is not None and event_epoch(ev) < since_ts:
+        return False
+    if until_ts is not None and event_epoch(ev) > until_ts:
+        return False
+    if action and ev.get("action") != action:
+        return False
+    if principal and (ev.get("principal") or {}).get("id") != principal:
+        return False
+    if route and ev.get("route") != route:
+        return False
+    if control and not any(
+        f.get("control") == control or f.get("id", "").startswith(control) for f in ev.get("findings", [])
+    ):
+        return False
+    return not (q and q.lower() not in json.dumps(ev, ensure_ascii=False, default=str).lower())
+
+
+# docs/API.md section 5
 CSV_FIELDS = [
-    "ts", "seq", "trace_id", "principal", "team", "session_id", "route", "direction", "model", "action",
-    "findings", "latency_ms_total", "cost_usd", "policy_version", "excerpt", "hash",
+    "ts", "seq", "trace_id", "type", "principal", "team", "session_id", "route", "direction", "model", "upstream",
+    "action", "enforced", "status_code", "top_finding", "findings", "owasp", "judge_invoked", "latency_total_ms",
+    "gateway_overhead_ms", "cost_usd", "policy_version", "approval_id", "excerpt", "prev_hash", "hash",
 ]
+
+_ACTION_RANK = {"allow": 0, "log": 1, "redact": 2, "require_approval": 3, "block": 4}
+_SEVERITY_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 
 def _cell(value: Any) -> Any:
     """Neutralize spreadsheet formulas: audit text is attacker-controlled (prompts, tool output)."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
     if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
         return "'" + value
     return value
 
 
-def to_csv(events: list[dict[str, Any]]) -> str:
+def top_finding(findings: list[dict[str, Any]]) -> str | None:
+    """Strongest action first, then highest severity, then highest score."""
+    if not findings:
+        return None
+    best = max(findings, key=lambda f: (
+        _ACTION_RANK.get(str(f.get("effective_action") or f.get("action")), 0),
+        _SEVERITY_RANK.get(str(f.get("severity")), 0),
+        float(f.get("score") or 0),
+    ))
+    return best.get("id")
+
+
+def csv_row(ev: dict[str, Any]) -> dict[str, Any]:
+    p = ev.get("principal") or {}
+    lat = ev.get("latency_ms") or {}
+    findings = ev.get("findings") or []
+    owasp = sorted({o for f in findings for o in (f.get("owasp_llm") or []) + (f.get("owasp_agentic") or [])})
+    row = {
+        "ts": ev.get("ts"),
+        "seq": ev.get("seq"),
+        "trace_id": ev.get("trace_id"),
+        "type": ev.get("type", "decision"),
+        "principal": p.get("id") if isinstance(p, dict) else p,
+        "team": p.get("team") if isinstance(p, dict) else None,
+        "session_id": ev.get("session_id"),
+        "route": ev.get("route"),
+        "direction": ev.get("direction"),
+        "model": ev.get("model"),
+        "upstream": ev.get("upstream"),
+        "action": ev.get("action"),
+        "enforced": ev.get("enforced"),
+        "status_code": ev.get("status_code"),
+        "top_finding": top_finding(findings),
+        "findings": ";".join(f.get("id", "") for f in findings),
+        "owasp": ";".join(owasp),
+        "judge_invoked": (ev.get("judge") or {}).get("invoked") if "judge" in ev else None,
+        "latency_total_ms": lat.get("total"),
+        "gateway_overhead_ms": lat.get("gateway_overhead"),
+        "cost_usd": (ev.get("usage") or {}).get("cost_usd"),
+        "policy_version": (ev.get("policy") or {}).get("version"),
+        "approval_id": ev.get("approval_id"),
+        "excerpt": ev.get("excerpt"),
+        "prev_hash": ev.get("prev_hash"),
+        "hash": ev.get("hash"),
+    }
+    return {k: ("" if v is None else _cell(v)) for k, v in row.items()}
+
+
+def csv_header() -> str:
     buf = io.StringIO()
-    w = csv.DictWriter(buf, fieldnames=CSV_FIELDS)
-    w.writeheader()
-    for ev in events:
-        p = ev.get("principal") or {}
-        lat = ev.get("latency_ms") or {}
-        w.writerow({k: _cell(v) for k, v in {
-                "ts": ev.get("ts"),
-                "seq": ev.get("seq"),
-                "trace_id": ev.get("trace_id"),
-                "principal": p.get("id"),
-                "team": p.get("team"),
-                "session_id": ev.get("session_id"),
-                "route": ev.get("route"),
-                "direction": ev.get("direction"),
-                "model": ev.get("model"),
-                "action": ev.get("action"),
-                "findings": ";".join(f.get("id", "") for f in ev.get("findings", [])),
-                "latency_ms_total": lat.get("total"),
-                "cost_usd": (ev.get("usage") or {}).get("cost_usd"),
-                "policy_version": (ev.get("policy") or {}).get("version"),
-                "excerpt": ev.get("excerpt"),
-                "hash": ev.get("hash"),
-            }.items()})
+    csv.DictWriter(buf, fieldnames=CSV_FIELDS, lineterminator="\r\n").writeheader()
     return buf.getvalue()
+
+
+def csv_line(ev: dict[str, Any]) -> str:
+    buf = io.StringIO()
+    csv.DictWriter(buf, fieldnames=CSV_FIELDS, lineterminator="\r\n").writerow(csv_row(ev))
+    return buf.getvalue()
+
+
+def to_csv(events: list[dict[str, Any]]) -> str:
+    """RFC 4180 CSV (CRLF line ends) with the columns of docs/API.md section 5."""
+    return csv_header() + "".join(csv_line(ev) for ev in events)
 
 
 def verify_file(path: str | Path) -> dict[str, Any]:
