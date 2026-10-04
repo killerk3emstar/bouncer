@@ -262,7 +262,7 @@ async def event_detail(request: Request, trace_id: str) -> Any:
     g = gw(request)
     events = g.audit.trace(trace_id)
     if not events:
-        return JSONResponse({"error": {"type": "not_found", "message": f"No event with trace id {trace_id} in the in-memory buffer; use the audit export for older events."}}, status_code=404)
+        return JSONResponse({"error": {"type": "not_found", "code": "events.not_found", "message": f"No event with trace id {trace_id} in the in-memory buffer; use the audit export for older events."}}, status_code=404)
     from bouncer.audit import chain_hash
 
     chain_ok = all(ev.get("hash") == chain_hash(ev.get("prev_hash", ""), ev) for ev in events if ev.get("hash"))
@@ -614,7 +614,7 @@ async def policy_save(request: Request, body: PolicyEdit) -> Any:
     current = g.policies.current
     if body.expected_version and body.expected_version != current.version:
         return JSONResponse(
-            {"error": {"type": "conflict", "message": f"The policy changed since you opened it (now {current.version}). Reload the page and apply your edit again."}},
+            {"error": {"type": "conflict", "code": "policy.version_conflict", "message": f"The policy changed since you opened it (now {current.version}). Reload the page and apply your edit again."}},
             status_code=409,
         )
     try:
@@ -870,7 +870,7 @@ async def approval_detail(request: Request, approval_id: str) -> Any:
     for appr in g.store.list_approvals():
         if appr.id == approval_id:
             return _approval_dict(appr, g)
-    return JSONResponse({"error": {"type": "not_found", "message": f"No approval {approval_id}"}}, status_code=404)
+    return JSONResponse({"error": {"type": "not_found", "code": "approvals.not_found", "message": f"No approval {approval_id}."}}, status_code=404)
 
 
 class ApprovalDecision(BaseModel):
@@ -925,7 +925,7 @@ async def playground(request: Request, body: PlaygroundIn) -> Any:
     g = gw(request)
     principal = g.policies.current.principal(body.principal)
     if principal is None:
-        return JSONResponse({"error": {"type": "invalid_request", "message": f"Unknown principal {body.principal}"}}, status_code=400)
+        return JSONResponse({"error": {"type": "invalid_request", "code": "playground.unknown_principal", "message": f"Unknown principal {body.principal}. Use one of the principals in the policy (principals section)."}}, status_code=400)
     messages = body.messages
     if not messages:
         messages = []
@@ -995,34 +995,40 @@ async def run_scenario(request: Request, scenario_id: str) -> Any:
         sc = yaml.safe_load(path.read_text()) or {}
         if isinstance(sc, dict) and sc.get("id") == scenario_id:
             return await run_scenario_file(g, sc)
-    return JSONResponse({"error": {"type": "not_found", "message": f"No scenario {scenario_id} in demo/scenarios/"}}, status_code=404)
+    return JSONResponse({"error": {"type": "not_found", "code": "scenarios.not_found", "message": f"No scenario {scenario_id} in demo/scenarios/."}}, status_code=404)
+
+
+_SELFTEST_LOCK = asyncio.Lock()
 
 
 @router.post("/api/selftest")
-async def selftest(request: Request) -> dict[str, Any]:
+async def selftest(request: Request) -> Any:
     from bouncer.selftest import run_selftest
 
-    started = now_iso()
-    t = time.perf_counter()
-    res = await asyncio.get_running_loop().run_in_executor(None, run_selftest)
-    out = {
-        "started_at": started,
-        "duration_ms": round((time.perf_counter() - t) * 1000),
-        "mode": "offline",
-        "command": "make test (YAML cases only; unit tests run with make test)",
-        "total": res["total"],
-        "passed": res["passed"],
-        "failed": res["failed"],
-        "skipped": 0,
-        "by_control": [{"control": c, "total": v["total"], "passed": v["passed"], "failed": v["failed"], "allow_cases": v["allow"], "block_cases": v["block"]} for c, v in sorted(res["by_control"].items())],
-        "failures": [
-            {"id": f["id"], "control": f["control"], "kind": f["kind"], "expected": f["kind"], "got": ",".join(f["actions"]), "message": "; ".join(f["failures"])[:500]}
-            for f in res["failures"]
-        ],
-        "report_url": None,
-    }
-    request.app.state.last_selftest = out
-    return out
+    if _SELFTEST_LOCK.locked():
+        return JSONResponse({"error": {"type": "conflict", "code": "selftest.running", "message": "A self-test is already running; its result appears when it finishes."}}, status_code=409)
+    async with _SELFTEST_LOCK:
+        started = now_iso()
+        t = time.perf_counter()
+        res = await asyncio.get_running_loop().run_in_executor(None, run_selftest)
+        out = {
+            "started_at": started,
+            "duration_ms": round((time.perf_counter() - t) * 1000),
+            "mode": "offline",
+            "command": "make test (YAML cases only; unit tests run with make test)",
+            "total": res["total"],
+            "passed": res["passed"],
+            "failed": res["failed"],
+            "skipped": 0,
+            "by_control": [{"control": c, "total": v["total"], "passed": v["passed"], "failed": v["failed"], "allow_cases": v["allow"], "block_cases": v["block"]} for c, v in sorted(res["by_control"].items())],
+            "failures": [
+                {"id": f["id"], "control": f["control"], "kind": f["kind"], "expected": f["kind"], "got": ",".join(f["actions"]), "message": "; ".join(f["failures"])[:500]}
+                for f in res["failures"]
+            ],
+            "report_url": None,
+        }
+        request.app.state.last_selftest = out
+        return out
 
 
 # ---------------------------------------------------------------------------- exports and report

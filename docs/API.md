@@ -21,8 +21,8 @@ Not implemented as specified here (open items):
   an approval is single-use and bound to the agent and session of the held call).
 - **Exports.** CSV cells that start with `=`, `+`, `-`, `@`, tab or carriage return get a leading `'` so a
   spreadsheet does not run them as formulas. An invalid `from` / `to` is a 422 with code `export.bad_timestamp`.
-- **Self-test.** No 409 for a second concurrent run; `report_url` is always `null`; `by_control` lists only
-  controls that have cases.
+- **Self-test.** `report_url` is always `null` (the HTML report is written by `make test` to
+  `reports/tests/report.html`); `by_control` lists only controls that have cases.
 - **System events.** `approval.decided` carries the trace id of the held request and the agent as `principal`;
   the other system events (`policy.reloaded`, `policy.reload_failed`, `feed.updated`, `feed.rejected`) use
   `principal: {"id": "system"}` and `action` `allow` (applied) or `block` (rejected, previous version stays). A feed
@@ -30,8 +30,8 @@ Not implemented as specified here (open items):
 - **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_tool`; `monitor_async` is never
   emitted.
 - **Budgets.** `state` is `ok`, `warning`, `downgraded` (spent; paid requests go to the local model) or `blocked`.
-- **Errors.** Most error bodies have no `code`. Request validation errors from FastAPI are 422 with
-  `{"detail": [...]}`.
+- **Errors.** Request validation errors are 422 with code `request.invalid` and a `details` list of the failing
+  fields.
 - **Latency.** GET endpoints answer in about 1 to 12 ms; the YAML case counts behind `/api/controls` and
   `/api/coverage` are re-read only when a file in `tests/cases/` changes.
 

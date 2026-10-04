@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import generate_latest
@@ -141,6 +142,16 @@ def create_app(
 
     app = FastAPI(title="Bouncer gateway", version="0.1.0", lifespan=lifespan)
     app.state.gw = state
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # same error shape as every other Bouncer error (and OpenAI's), not FastAPI's {"detail": [...]}
+        errs = exc.errors()
+        first = errs[0] if errs else {}
+        where = ".".join(str(x) for x in first.get("loc", ()) if x != "body") or "request"
+        msg = f"Invalid request: {where}: {first.get('msg', 'invalid value')}."
+        details = [{"loc": [str(x) for x in e.get("loc", ())], "msg": e.get("msg")} for e in errs[:10]]
+        return JSONResponse({"error": {"type": "invalid_request", "code": "request.invalid", "message": msg, "details": details}}, status_code=422)
     app.include_router(openai_proxy.router)
     app.include_router(guard_api.router)
     try:
@@ -166,7 +177,7 @@ def create_app(
             auth = request.headers.get("authorization", "")
             given = auth[7:].strip() if auth.lower().startswith("bearer ") else ""  # header only: query strings end up in logs
             if not hmac.compare_digest(given.encode(), token.encode()):
-                return JSONResponse({"error": {"type": "unauthorized", "message": "Admin token required (Authorization: Bearer <BOUNCER_ADMIN_TOKEN>)."}}, status_code=401)
+                return JSONResponse({"error": {"type": "unauthorized", "code": "admin.token_required", "message": "Admin token required (Authorization: Bearer <BOUNCER_ADMIN_TOKEN>)."}}, status_code=401)
         return await call_next(request)
 
     @app.middleware("http")

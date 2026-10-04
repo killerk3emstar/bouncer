@@ -471,3 +471,45 @@ def test_policy_reload_is_a_system_event_in_events_and_audit(tmp_path: Path) -> 
     assert asyncio.run(get(f"/api/events/{ok['trace_id']}")).status_code == 200
     # stats and the Overview count decisions only
     assert asyncio.run(get("/api/stats")).json()["totals"]["requests"] == 0
+
+
+def test_request_validation_errors_use_the_bouncer_error_shape(tmp_path: Path) -> None:
+    app = create_app(
+        Settings(policy_path="policy/bouncer.yaml", audit_path=str(tmp_path / "a.jsonl"), t1="fake", judge_override="fake", watch=False, admin_token="adm_test_token"),
+        upstream_transport=httpx.ASGITransport(app=create_mock(MockState())),
+    )
+
+    async def post() -> httpx.Response:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await c.post("/api/approvals/apr_x", json={"note": 5}, headers={"Authorization": "Bearer adm_test_token"})
+
+    r = asyncio.run(post())
+    assert r.status_code == 422
+    err = r.json()["error"]
+    assert err["type"] == "invalid_request" and err["code"] == "request.invalid" and err["message"].startswith("Invalid request:")
+
+
+def test_second_concurrent_selftest_gets_409(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    import time as _t
+
+    import bouncer.selftest
+
+    def slow_run() -> dict:
+        _t.sleep(0.3)
+        return {"total": 1, "passed": 1, "failed": 0, "by_control": {}, "failures": []}
+
+    monkeypatch.setattr(bouncer.selftest, "run_selftest", slow_run)
+    app = create_app(
+        Settings(policy_path="policy/bouncer.yaml", audit_path=str(tmp_path / "a.jsonl"), t1="fake", judge_override="fake", watch=False, admin_token="adm_test_token"),
+        upstream_transport=httpx.ASGITransport(app=create_mock(MockState())),
+    )
+
+    async def both() -> list[int]:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t", timeout=10) as c:
+            h = {"Authorization": "Bearer adm_test_token"}
+            first = asyncio.create_task(c.post("/api/selftest", json={}, headers=h))
+            await asyncio.sleep(0.1)
+            second = await c.post("/api/selftest", json={}, headers=h)
+            return [(await first).status_code, second.status_code]
+
+    assert asyncio.run(both()) == [200, 409]
