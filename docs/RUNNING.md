@@ -119,7 +119,7 @@ All services bind to 127.0.0.1 (natively and, through the published ports, in Do
 | 8703 | demo MCP server `demo-bank` (`/mcp`, `/health`, `/admin/poison`) | `make dev`, `make mcp`, compose `mcp` |
 | 8704 | signature feed server (`/feed.json`, `/feed.json.sig`, `/feed.pub`) | `make dev`, `make feed`, compose `feed` |
 | 8705, 8706 | `make bench` (its own gateway and mock) | `scripts/bench.py` |
-| 6390 | Redis (reserved for multi-replica budget counters; not used by this build) | compose profile `redis` |
+| 6390 | Redis: shared store for several gateway replicas (`BOUNCER_STORE=redis://127.0.0.1:6390/0`) | compose profile `redis` |
 | 11434 | Ollama (external, shared) | Ollama |
 
 ## Environment variables
@@ -140,6 +140,8 @@ in the environment win).
 | `BOUNCER_JUDGE` | unset (policy `judge.backend`) | gateway | force a judge backend: `fake` (in-process, no model), `none`, or a remote backend name |
 | `BOUNCER_ADMIN_TOKEN` | empty: a random token per run (logged by the gateway; `make dev` prints a dashboard link with it) | gateway, `make dev`, live tests | `/api/*`, `/admin/*` and `/reports/*` need `Authorization: Bearer <token>`; agent keys are not accepted there. `off` disables the check (unsafe on a host that agents share) |
 | `BOUNCER_WATCH` | `1` | gateway | `0` disables policy hot reload and feed refresh |
+| `BOUNCER_STORE` | `memory` | gateway | where budgets, sessions, approvals and MCP pins live: `memory` (this process only) or `redis://host:port/db` (shared by several replicas; the gateway refuses to start when Redis is unreachable) |
+| `BOUNCER_STORE_PREFIX` | `bouncer:` | gateway | key prefix in Redis; separate deployments on one Redis need different prefixes |
 | `BOUNCER_LOG_LEVEL` | `INFO` | gateway | Python log level |
 | `BOUNCER_MCP_UPSTREAM` | `http://127.0.0.1:8703/mcp` | gateway | MCP server behind the `/mcp` gateway |
 | `BOUNCER_MCP_SERVER`, `BOUNCER_MCP_RECHECK_SECONDS` | unset, `0` | gateway | MCP server name override; tool definitions are re-read from the server before a call when the last check is older than this (0 = before every call) |
@@ -202,16 +204,74 @@ How the container stack differs from `make dev`:
   start and logs it with a dashboard link (`docker compose logs gateway | grep BOUNCER_ADMIN_TOKEN`).
 - **Ports** bind to 127.0.0.1. Change the host side with `BOUNCER_HOST_PORT`, `MOCK_HOST_PORT`,
   `MCP_HOST_PORT`, `FEED_HOST_PORT`, `JUDGE_HOST_PORT`, `REDIS_HOST_PORT`.
-- **Redis** (`--profile redis`, :6390) is provided for the multi-replica design; this build keeps budget
-  counters in memory and does not connect to it.
+- **Redis** (`--profile redis`, :6390) is the shared store for several gateway replicas. The gateway uses it
+  only when `BOUNCER_STORE` points at it (see [Several replicas](#several-replicas)); the compose `gateway`
+  service keeps the in-memory store.
 - The Clef MLX judge does not run in Linux containers (MLX needs Apple Silicon); the image skips `mlx`,
   `mlx-lm` and `transformers` through the platform markers in `pyproject.toml`.
 - Containers run as an unprivileged user (uid 10001), except the throwaway `tests` container, which runs
   as root only so it can write the report into the bind-mounted `./reports/tests` on Linux hosts.
 
 Not verified: the `cpu-judge` profile end to end (it would load `llama-guard3:1b` into the shared Ollama),
-the `redis` profile, and Docker Engine on Linux (`host.docker.internal` is mapped with `host-gateway`;
+the compose `gateway` service with `BOUNCER_STORE` set, and Docker Engine on Linux (`host.docker.internal` is mapped with `host-gateway`;
 on Linux, Ollama must listen on an address the containers can reach, for example `OLLAMA_HOST=0.0.0.0`).
+
+## Several replicas
+
+By default each gateway keeps budgets, sessions (taint, steps, loop history, circuit breaker), approvals and
+MCP pins in its own memory. With `BOUNCER_STORE=redis://...` they live in Redis and every replica sees the
+same values: a team's daily spend counts requests from all replicas, an approval granted through one replica
+lets the agent's call through on another, exactly once. The scan caches stay local to each replica, and each
+replica writes its own audit log.
+
+Two replicas on one host, run from the repository root (the simulated upstream on :8702 must be running,
+for example from `make dev`; ports 8705 and 8706 are also the `make bench` ports, so do not run both at once):
+
+```
+docker compose --profile redis up -d redis
+
+BOUNCER_PORT=8705 BOUNCER_STORE=redis://127.0.0.1:6390/0 BOUNCER_AUDIT_PATH=/tmp/bouncer-r1/audit.jsonl \
+  BOUNCER_WATCH=0 BOUNCER_JUDGE=fake BOUNCER_ADMIN_TOKEN=adm_test uv run python -m bouncer.gateway.app &
+BOUNCER_PORT=8706 BOUNCER_STORE=redis://127.0.0.1:6390/0 BOUNCER_AUDIT_PATH=/tmp/bouncer-r2/audit.jsonl \
+  BOUNCER_WATCH=0 BOUNCER_JUDGE=fake BOUNCER_ADMIN_TOKEN=adm_test uv run python -m bouncer.gateway.app &
+
+# a request through replica 1 ...
+curl -s localhost:8705/v1/chat/completions -H "Authorization: Bearer $BOUNCER_KEY_OPS_COPILOT" \
+  -H "X-Bouncer-Session: r-1" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"What are the branch hours?"}]}'
+# ... is counted in the operations budget on replica 2
+curl -s localhost:8706/api/budgets -H "Authorization: Bearer adm_test"
+
+# a transfer above the limit needs approval on replica 1, is approved on replica 2,
+# passes once on replica 2 and needs a new approval on replica 1
+cat > /tmp/transfer.json <<'JSON'
+{"tool_call": {"name": "payments.create_transfer", "arguments": {"from_account": "A",
+ "to_iban": "PL61109010140000071219812874", "amount": 5000, "currency": "PLN", "title": "invoice 17"}},
+ "user_request": "pay invoice 17, 5000 PLN"}
+JSON
+check() {  # $1 = gateway port
+  curl -s localhost:$1/v1/guard/check -H "Authorization: Bearer $BOUNCER_KEY_OPS_COPILOT" \
+    -H "Content-Type: application/json" -H "X-Bouncer-Session: r-2" -d @/tmp/transfer.json; echo
+}
+check 8705    # "action":"require_approval", "approval_id":"apr_..."
+curl -s localhost:8706/api/approvals/apr_... -H "Authorization: Bearer adm_test" \
+  -H "Content-Type: application/json" -d '{"decision":"approve"}'
+check 8706    # "action":"log", "allowed":true: the approval is consumed
+check 8705    # "action":"require_approval" again
+curl -s localhost:8705/v1/approvals/apr_... -H "Authorization: Bearer $BOUNCER_KEY_OPS_COPILOT"   # "status":"used"
+```
+
+What was checked this way (both replicas with the policy from this repository): after one chat request
+through :8705, `/api/budgets` on :8706 showed the operations team with `requests: 1`, `spent_usd: 0.000015`
+and `tokens_last_minute: 44`; an approval created on :8705 and approved on :8706 let the same tool call through
+once on :8706, `GET /v1/approvals/<id>` on :8705 returned `"status": "used"`, the same call on :8705 needed
+a new approval, and deciding the approval again on :8705 returned 409. With `BOUNCER_STORE` pointing at a
+Redis that does not answer, the gateway logs `Redis is not reachable` and exits with code 2.
+`tests/unit/core/test_store_redis.py` covers the same behaviour offline with `fakeredis` (two stores on one
+fake server, and two gateway apps sharing it).
+
+Keep the policy files of all replicas identical (each replica hot-reloads its own copy). A load balancer in
+front of the replicas and Redis Sentinel or Cluster were not tested.
 
 ## Troubleshooting
 

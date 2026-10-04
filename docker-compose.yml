@@ -3,7 +3,7 @@
 #   docker compose up -d --build        gateway :8700 + simulated upstream :8702 + demo MCP :8703 + feed :8704
 #   docker compose run --rm tests       offline test suite (no network, no models), reports in ./reports/tests
 #   docker compose --profile cpu-judge up -d    adds the T2 judge (ollama-guard backend, needs Ollama on the host)
-#   docker compose --profile redis up -d        adds Redis on :6390 (reserved for multi-replica budgets; not used by this build)
+#   docker compose --profile redis up -d        adds Redis on :6390, the shared store for several gateway replicas (BOUNCER_STORE=redis://127.0.0.1:6390/0, docs/RUNNING.md)
 #
 # Ports are bound to 127.0.0.1 only. Host ports can be changed without editing this file:
 #   BOUNCER_HOST_PORT, MOCK_HOST_PORT, MCP_HOST_PORT, FEED_HOST_PORT, JUDGE_HOST_PORT, REDIS_HOST_PORT

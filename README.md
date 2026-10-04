@@ -160,7 +160,7 @@ On the bank-operations set alone the pipeline catches 120 of 134 attacks (90%) w
 
 ## Architecture
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagram and the request flow. In short: FastAPI gateway, stateless per request; shared counters (budgets, sessions, approvals, MCP pins) behind a store interface, kept in memory in this build (one node; a Redis-backed store for several replicas is designed, not built); the judge as a separate service with a `POST /v1/decide` interface (Clef on MLX on a Mac, Llama Guard via Ollama elsewhere; another server can implement the same interface); policy from a file with a version hash in every audit event.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagram and the request flow. In short: FastAPI gateway, stateless per request; shared counters (budgets, sessions, approvals, MCP pins) behind a store interface, kept in process memory by default (one node) or in Redis with `BOUNCER_STORE=redis://...`, so several gateway replicas share budgets, sessions, approvals and MCP pins (checked with two replicas on one host, see [docs/RUNNING.md](docs/RUNNING.md#several-replicas)); the judge as a separate service with a `POST /v1/decide` interface (Clef on MLX on a Mac, Llama Guard via Ollama elsewhere; another server can implement the same interface); policy from a file with a version hash in every audit event.
 
 ## Repository
 
