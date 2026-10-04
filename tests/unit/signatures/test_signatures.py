@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -225,6 +226,22 @@ def test_hit_counters_increment(record_property):  # noqa: ANN001
     _scan(ctrl, positive, "tool_call")
     after = {s["id"]: s["hits_total"] for s in store.status()["signatures"]}
     assert after["SIG-0004"] == before["SIG-0004"] + 1
+
+
+def test_status_matches_api_contract(record_property):  # noqa: ANN001
+    # docs/API.md 4.x /api/signatures: ISO timestamps and hits_24h next to hits_total and last_hit
+    record_property("kind", "allow")
+    store = _shipped_store()
+    ctrl = _ctrl(store)
+    _, positive, _ = SAMPLES["SIG-0004"]
+    _scan(ctrl, positive, "tool_call")
+    st = store.status()
+    iso = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
+    assert iso.match(st["loaded_at"]) and iso.match(st["last_check"])
+    assert st["last_error"] is None and st["last_error_at"] is None
+    sig = next(s for s in st["signatures"] if s["id"] == "SIG-0004")
+    assert sig["hits_24h"] == sig["hits_total"] == 1
+    assert iso.match(sig["last_hit"])
 
 
 def test_finding_message_and_mapping(record_property):  # noqa: ANN001

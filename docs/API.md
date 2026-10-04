@@ -59,8 +59,8 @@ Shapes that differ from the examples below (the dashboard handles them):
 - `/api/coverage`: a cell's `tests` is the number of YAML cases of that control (not per risk); a control with no
   cases gives a `partial` cell; failing tests do not change the status.
 - `/api/policy/versions`: `diff` is `null` for the first load; `summary` shows the first added lines.
-- `/api/signatures`: `loaded_at` and `last_check` are Unix seconds; no `hits_24h` or `last_error_at`; the key
-  fingerprint has 16 hex characters; `targets` use the feed names (`tool_args`, not `tool_call`).
+- `/api/signatures`: the key fingerprint has 16 hex characters; `targets` use the feed names (`tool_args`, not
+  `tool_call`); hit counters start at zero when the gateway starts.
 - `/api/scenarios`: ids are `s1-customer-lookup`, `s2-env-secrets`, `s3-indirect-injection-trifecta`,
   `s3b-ascii-smuggling`, `s3c-markdown-exfiltration`, `s3d-polish-injection`, `s3e-trifecta-approval`,
   `s4-tool-loop`, `s5-team-budget`, `s6-pickle-exploit`, `s7-policy-change-email`, `s8-mcp-rug-pull`;

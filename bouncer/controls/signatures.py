@@ -30,6 +30,7 @@ import logging
 import re
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -254,14 +255,16 @@ class FeedStore:
         self._lock = threading.RLock()
         self.active: ActiveFeed | None = None
         self.last_error: str | None = None
+        self.last_error_at: float | None = None
         self.last_check: float = 0.0
         self._last_mtime: float = 0.0
-        self.hits: dict[str, dict[str, Any]] = {}  # signature id -> {count, last_hit}
+        self.hits: dict[str, dict[str, Any]] = {}  # signature id -> {count, last_hit, times}
 
         try:
             self._load()
         except FeedVerifyError as exc:
             self.last_error = str(exc)
+            self.last_error_at = time.time()
             log.error("signature feed rejected at startup: %s", exc)
 
     # ---------------------------------------------------------------- loading
@@ -378,7 +381,7 @@ class FeedStore:
             self.active = active
             self.last_error = None
             for sig in compiled:
-                self.hits.setdefault(sig.id, {"count": 0, "last_hit": None})
+                self.hits.setdefault(sig.id, {"count": 0, "last_hit": None, "times": deque(maxlen=10_000)})
         log.info(
             "signature feed loaded: %s v%s (%d signatures, verified=%s)",
             model.feed,
@@ -412,20 +415,24 @@ class FeedStore:
         except FeedVerifyError as exc:
             with self._lock:
                 self.last_error = str(exc)
+                self.last_error_at = time.time()
             log.warning("signature feed update rejected, keeping previous version: %s", exc)
             return False
         except Exception as exc:  # network / IO
             with self._lock:
                 self.last_error = f"{type(exc).__name__}: {exc}"
+                self.last_error_at = time.time()
             self.last_check = now
             log.warning("signature feed refresh failed, keeping previous version: %s", exc)
             return False
 
     def record_hit(self, signature_id: str) -> None:
         with self._lock:
-            h = self.hits.setdefault(signature_id, {"count": 0, "last_hit": None})
+            h = self.hits.setdefault(signature_id, {"count": 0, "last_hit": None, "times": deque(maxlen=10_000)})
+            now = time.time()
             h["count"] += 1
-            h["last_hit"] = datetime.now(UTC).isoformat()
+            h["last_hit"] = _iso(now)
+            h["times"].append(now)
 
     def public_key_fingerprint(self) -> str | None:
         try:
@@ -438,13 +445,14 @@ class FeedStore:
 
     def status(self) -> dict[str, Any]:
         """Snapshot for GET /api/signatures: feed metadata plus a per-signature list with hits."""
+        day_ago = time.time() - 86_400
         with self._lock:
             a = self.active
             sigs: list[dict[str, Any]] = []
             if a is not None:
                 for cs in a.compiled:
                     s = cs.model
-                    h = self.hits.get(s.id, {"count": 0, "last_hit": None})
+                    h = self.hits.get(s.id, {"count": 0, "last_hit": None, "times": ()})
                     sigs.append(
                         {
                             "id": s.id,
@@ -461,6 +469,7 @@ class FeedStore:
                             "owasp_agentic": s.owasp_agentic,
                             "atlas": s.atlas,
                             "added": s.added,
+                            "hits_24h": sum(1 for t in h["times"] if t >= day_ago),
                             "hits_total": h["count"],
                             "last_hit": h["last_hit"],
                         }
@@ -474,12 +483,18 @@ class FeedStore:
                 "verified": a.verified if a else False,
                 "require_signature": self.require_signature,
                 "public_key_fingerprint": self.public_key_fingerprint(),
-                "loaded_at": a.loaded_at if a else None,
-                "last_check": self.last_check or None,
+                "loaded_at": _iso(a.loaded_at) if a else None,
+                "last_check": _iso(self.last_check) if self.last_check else None,
                 "last_error": self.last_error,
+                "last_error_at": _iso(self.last_error_at) if self.last_error and self.last_error_at else None,
                 "signature_count": len(a.compiled) if a else 0,
                 "signatures": sigs,
             }
+
+
+def _iso(ts: float) -> str:
+    """Unix seconds -> 2026-10-04T01:00:31.208Z, the timestamp format of the admin API."""
+    return datetime.fromtimestamp(ts, UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 # --------------------------------------------------------------------------- the control
