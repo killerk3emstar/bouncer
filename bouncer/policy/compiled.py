@@ -29,6 +29,7 @@ TEXT_CONTROLS: list[tuple[str, str, str]] = [
     ("signatures", "bouncer.controls.signatures", "SignaturesControl"),
     ("output_safety", "bouncer.controls.output_safety", "OutputSafetyControl"),
     ("supply_chain", "bouncer.controls.supply_chain", "SupplyChainControl"),
+    ("harmful_content", "bouncer.controls.harmful_content", "HarmfulContentControl"),
 ]
 
 # Every control the gateway knows about, for the dashboard and coverage (id -> OWASP mapping).
@@ -46,6 +47,7 @@ CONTROL_CATALOG: dict[str, dict[str, Any]] = {
     "signatures": {"title": "Historical attack signatures (signed feed)", "owasp_llm": ["LLM01", "LLM03", "LLM05"], "owasp_agentic": ["ASI04", "ASI05"], "tier": "T0", "atlas": []},
     "supply_chain": {"title": "Supply chain: model sources, trust_remote_code, MCP server allowlist", "owasp_llm": ["LLM03"], "owasp_agentic": ["ASI04"], "tier": "T0", "atlas": ["AML.T0010.003", "AML.T0010.005", "AML.T0011.000"]},
     "mcp_pinning": {"title": "MCP tool definition pinning (rug pull detection)", "owasp_llm": ["LLM03"], "owasp_agentic": ["ASI04"], "tier": "T0", "atlas": ["AML.T0109", "AML.T0110"]},
+    "harmful_content": {"title": "Harmful requests: financial crime, fraud, cyberattacks, violence, self-harm", "owasp_llm": [], "owasp_agentic": [], "tier": "T0/T2", "atlas": ["AML.T0048.000", "AML.T0048.003"]},
     "approvals": {"title": "Human approval for risky actions", "owasp_llm": ["LLM06"], "owasp_agentic": ["ASI09"], "tier": "-", "atlas": ["AML.T0053"]},
 }
 

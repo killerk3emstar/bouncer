@@ -4,7 +4,7 @@ import { histogram, lineChart, mountChart } from '../charts.js';
 import { html, fmtMs, fmtInt, fmtPct, errorBox, emptyRow, timeEl, store, isNum } from '../util.js';
 
 const WINDOWS = ['1h', '24h', '7d'];
-const REASONS = { t1_grey_zone: 'T1 grey zone', non_english: 'non-English text', side_effect_tool: 'side-effect tool call', monitor_async: 'monitor mode (async)' };
+const REASONS = { t1_grey_zone: 'T1 grey zone', non_english: 'non-English text', side_effect_tool: 'side-effect tool call', harm_signal: 'harmful-request signal', monitor_async: 'monitor mode (async)' };
 
 function tile(label, value, sub) {
   return html`<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || ''}</div></div>`;

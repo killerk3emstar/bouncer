@@ -59,6 +59,7 @@ Scope: an organization runs AI agents (internal copilots, coding assistants, aut
 ## Out of scope and residual risk
 
 - **Hallucination and misinformation** (OWASP LLM09): not a control-layer problem; not addressed.
+- **Harmful requests** (`harmful_content`): checked on user messages only, not on the model's answers; an attacker who gets harmful text out of the model by other means (role play the judge does not flag) is not stopped by this control. Patterns cover EN, PL and DE; other languages rely on the judge, which only runs when a topic term matched.
 - **Training data and model poisoning** (LLM04): only model-source allowlisting and unsafe deserialization signatures.
 - **Vector store access control** (LLM08): retrieved fragments are scanned as untrusted input when they pass through tool results; the store itself is not governed.
 - **Agent-to-agent communication** (ASI07, partial): delegation between agents is checked against the policy (`may_act_for`) and the guard API can check any message, but messages between agents are not signed end to end, and the MCP gateway does not accept delegation.

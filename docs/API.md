@@ -27,7 +27,7 @@ Differences from the specification below, and details it does not cover:
   the other system events (`policy.reloaded`, `policy.reload_failed`, `feed.updated`, `feed.rejected`) use
   `principal: {"id": "system"}` and `action` `allow` (applied) or `block` (rejected, previous version stays). A feed
   update rejected for the same reason again is recorded once.
-- **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_tool`; `monitor_async` is never
+- **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english`, `side_effect_tool` or `harm_signal`; `monitor_async` is never
   emitted.
 - **Budgets.** `state` is `ok`, `warning`, `downgraded` (spent; paid requests go to the local model) or `blocked`.
 - **Errors.** Request validation errors are 422 with code `request.invalid` and a `details` list of the failing
@@ -142,7 +142,7 @@ The dashboard shows `error.message` next to the HTTP status. Use 400/422 for bad
 | `findings[].reason` | added | One sentence: what matched and which threshold or rule applied. Shown in the trace. |
 | `findings[].span` | as PLAN | `[start, end]` character offsets in the scanned text, or `null`. |
 | `findings[].evidence` | as PLAN | Masked evidence only (`AKIA************MPLE`), or `null`. Never raw secrets or PII. |
-| `judge` | as PLAN | Always an object. When T2 did not run: `{"invoked": false, "reason": null, "backend": null, "answers": {}, "latency_ms": 0, "cached": false}`. `reason` is one of `t1_grey_zone`, `non_english`, `side_effect_tool`, `monitor_async`. `answers` maps question name to `{option: probability}`. |
+| `judge` | as PLAN | Always an object. When T2 did not run: `{"invoked": false, "reason": null, "backend": null, "answers": {}, "latency_ms": 0, "cached": false}`. `reason` is one of `t1_grey_zone`, `non_english`, `side_effect_tool`, `harm_signal`, `monitor_async`. `answers` maps question name to `{option: probability}`. |
 | `usage.budget_left_usd` | as PLAN | Team budget left today after this request, `null` if not applicable. |
 
 One trace can produce several events (for example input scan and output scan of the same request); they share `trace_id` and are ordered by `seq`.

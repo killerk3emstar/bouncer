@@ -252,8 +252,10 @@ class SupplyChainCfg(ControlCfg):
 
 
 class HarmfulContentCfg(ControlCfg):
-    judge: JudgeThresholds = JudgeThresholds(block_above=0.80, approval_above=0.80)
-    categories: list[str] = ["cyberattack", "fraud", "violence", "self_harm", "hate"]
+    action: ActionName = "block"  # strong T0 signal: the harmful aim is explicit (concealment, attack artefact)
+    judge: JudgeThresholds = JudgeThresholds(block_above=0.85, approval_above=0.85)  # weak signal: asked to T2
+    categories: list[Literal["financial_crime", "fraud", "cyberattack", "violence", "self_harm"]] = [
+        "financial_crime", "fraud", "cyberattack", "violence", "self_harm"]
 
 
 class Controls(Strict):

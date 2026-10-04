@@ -8,7 +8,7 @@ Known question ids:
     injection       noul    weighted injection phrases in UNTRUSTED_CONTENT (EN + PL)
     exfiltration    noul    external recipient or URL in PROPOSED_ACTION plus sensitive data markers
     goal_alignment  score   side-effect tool in PROPOSED_ACTION that USER_REQUEST never asked for
-    harm            choice  keyword lists per category
+    harm            choice  keyword lists per category (noul: yes when any category matches)
 Any other question gets a uniform distribution.
 
 Tests can pin exact answers without touching the request text:
@@ -125,8 +125,8 @@ TOOL_NAME_RE = re.compile(r"\b([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)\b", re.I)
 HARM_KEYWORDS: dict[str, re.Pattern[str]] = {
     "cyberattack": re.compile(r"\b(malware|ransomware|ddos|keylogger|exploit kit|botnet|reverse shell|"
                               r"credential stuffing|phishing kit)\b", _F),
-    "fraud": re.compile(r"\b(launder\w*|money mule|fake invoices?|forged?|bypass kyc|scam|phishing (email|page)|"
-                        r"pranie pieniędzy|wyłudz\w*)\b", _F),
+    "fraud": re.compile(r"\b(launder\w*|money mules?|fake invoices?|forged?|bypass kyc|scam|phishing (email|page)|"
+                        r"shell compan\w*|structur\w* (cash|deposits?)|sanction\w*|pranie pieniędzy|wyprać|wyłudz\w*)\b", _F),
     "violence": re.compile(r"\b(kill|bomb|shoot|weapon|explosive|zabij\w*|bomb\w*)\b", _F),
     "self_harm": re.compile(r"\b(suicide|self[- ]harm|hurt myself|kill myself|samobój\w*)\b", _F),
     "hate": re.compile(r"\b(subhuman|ethnic cleansing|exterminate)\b", _F),
@@ -217,6 +217,12 @@ class FakeBackend(Backend):
             return spread_ordinal(keys, GOAL_DISTRIBUTIONS[verdict]), rules
         if qid == "harm" and q["type"] == "choice":
             return score_harm(keys, " ".join(fields.values()))
+        if qid == "harm" and q["type"] == "noul":
+            # USER_MESSAGE lands in UNTRUSTED_CONTENT (see the injection branch above)
+            text = fields["UNTRUSTED_CONTENT"]
+            hits = [k for k, pat in HARM_KEYWORDS.items() if pat.search(text)]
+            p = 0.9 if hits else 0.05
+            return {"yes": p, "no": 1 - p}, [f"harm:{k}" for k in hits]
         return {k: 1.0 / len(keys) for k in keys}, []
 
     def score_exfiltration(self, action: str) -> tuple[float, list[str]]:

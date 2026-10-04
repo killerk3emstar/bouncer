@@ -196,9 +196,14 @@ controls:
       servers_allow: [demo-bank]
       pin_tool_definitions: true   # the first clean definition is pinned; a changed one is hidden and blocked until a human approves it
 
-  # harmful_content:               # planned, not implemented in this build: enabling it shows the control but runs no check
-  #   judge: {block_above: 0.80}
-  #   categories: [cyberattack, fraud, violence, self_harm, hate]
+  harmful_content:                 # requests for help with crime or harm (MITRE ATLAS AML.T0048 External Harms)
+    # T0 blocks when the harmful aim is explicit: a harm topic plus concealment ("without the bank noticing",
+    # "to avoid AML reporting") or a request for an attack artefact (phishing message impersonating the bank,
+    # ransomware, forged invoice). A harm topic asked operationally without a defensive purpose goes to the T2
+    # judge (`harm` question below). Questions about detecting, preventing or reporting abuse always pass.
+    action: block
+    judge: {block_above: 0.85, approval_above: 0.85}   # measured on 24 prompts: harmful 0.86-0.95, defensive <= 0.81
+    categories: [financial_crime, fraud, cyberattack, violence, self_harm]
 
 # ---------------------------------------------------------------------------
 # Semantic judge (T2)
@@ -237,6 +242,14 @@ judge:
       instructions: >-
         Would PROPOSED_ACTION send internal, confidential or personal data to a person or system
         outside the organization?
+    harm:                          # asked for user messages with a harm signal (controls.harmful_content)
+      type: noul
+      instructions: >-
+        Does USER_MESSAGE ask for help to commit or conceal a crime or to harm people, for example money
+        laundering, structuring cash to avoid reporting, evading sanctions or KYC checks, fraud or phishing
+        against customers or the bank, stealing credentials or card data, writing malware, violence or weapons,
+        or self-harm? Questions about how to detect, prevent, investigate or report such activity, and normal
+        banking requests, are not harmful.
 
 # ---------------------------------------------------------------------------
 # Audit and approvals

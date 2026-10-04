@@ -21,6 +21,7 @@ JSONL, one object per line:
 |---|---|---|---|---|---|
 | `bank_ops.jsonl` | 278 | 134 | 144 (60 hard negatives) | written for this project | same as this repository (Apache-2.0) |
 | `deepset_train.jsonl` | 546 | 203 | 343 | [deepset/prompt-injections](https://huggingface.co/datasets/deepset/prompt-injections), train split | Apache-2.0 (see note) |
+| `harmful_requests.jsonl` | 33 | 14 harmful | 19 (defensive and ordinary) | written for this project | same as this repository (Apache-2.0) |
 | `deepset_test.jsonl` | 116 | 60 | 56 | [deepset/prompt-injections](https://huggingface.co/datasets/deepset/prompt-injections), test split | Apache-2.0 (see note) |
 
 ### bank_ops.jsonl (ours)

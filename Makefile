@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 PY := $(UV) run python
 
-.PHONY: help setup models dev gateway mock mcp feed judge judge-fake test test-live eval eval-full bench demo verify-audit sign-feed lint docker-build docker-up docker-down docker-test clean-data
+.PHONY: help setup models dev gateway mock mcp feed judge judge-fake test test-live eval eval-full harm-probe bench demo verify-audit sign-feed lint docker-build docker-up docker-down docker-test clean-data
 
 help:
 	@echo "make setup         install dependencies (uv sync) and create .env from .env.example"
@@ -14,6 +14,7 @@ help:
 	@echo "make test-live     the same cases against the running stack with real T1/T2"
 	@echo "make eval          detection quality of T0 and T1 (no judge needed), reports/eval_quick.md"
 	@echo "make eval-full     T0, T1 and the full pipeline with the T2 judge (needs make judge), reports/eval_layers.md"
+	@echo "make harm-probe    harmful requests through the running stack, reports/harmful_content.md"
 	@echo "make bench         gateway latency overhead, reports/bench.md"
 	@echo "make demo          scripted Bank Ops Copilot scenarios against the running stack"
 	@echo "make verify-audit  check the audit log hash chain"
@@ -64,6 +65,9 @@ eval:
 
 eval-full:
 	$(PY) eval/run_eval.py --layers t1,eval.layers:t0,eval.layers:pipeline --datasets bank_ops,deepset_test --out eval_layers
+
+harm-probe:
+	$(PY) scripts/harm_probe.py
 
 bench:
 	$(PY) scripts/bench.py

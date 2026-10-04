@@ -117,6 +117,7 @@ FINDING_ATLAS: dict[str, list[str]] = {
     "supply_chain.unsafe_weights_format": ["AML.T0011.000"],
     "prompt_injection": ["AML.T0051"],  # LLM Prompt Injection (T1 and T2 findings; T0 sets .000 / .001)
     "output_safety.canary": ["AML.T0056"],  # Extract LLM System Prompt
+    "harmful_content": ["AML.T0048.000"],  # External Harms: Financial Harm
 }
 
 

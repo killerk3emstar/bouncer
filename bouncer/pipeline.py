@@ -424,6 +424,9 @@ class Engine:
             findings.extend(await self._semantic_injection(ctx, cleaned, pi))
         elif pi is not None:
             ctx.notes.append("semantic layers skipped: a deterministic control already blocks this request")
+        hc = doc.controls.harmful_content if _enabled(doc.controls.harmful_content) else None
+        if hc is not None and not self._enforced_block(ctx, findings):
+            findings.extend(await self._semantic_harm(ctx, cleaned, hc))
 
         # an approved identical input passes its require_approval findings; the key is a hash of the raw
         # text and is never stored as text (the audit excerpt is taken after redaction, below)
@@ -589,6 +592,55 @@ class Engine:
         # T2 judge on escalations
         if escalate:
             out.extend(await self._judge_injection(ctx, escalate, pi))
+        return out
+
+    async def _semantic_harm(self, ctx: RequestCtx, cleaned: list[tuple[Segment, str, list[Finding]]], hc: Any) -> list[Finding]:
+        """Weak harm signals in user messages (a harm topic asked operationally, no defensive purpose) go to the
+        T2 judge's `harm` question; strong ones were already blocked at T0 by the harmful_content control."""
+        from bouncer.controls.harmful_content import CATEGORY_LABEL, assess
+
+        out: list[Finding] = []
+        question = ctx.doc.judge.questions.get("harm")
+        for seg, clean, segf in cleaned:
+            if seg.direction != "input" or seg.role != "user" or any(f.control == "harmful_content" for f in segf):
+                continue
+            text = apply_redactions(clean, [f for f in segf if f.control in REDACTION_CONTROLS and f.span is not None])
+            sig = assess(text, list(hc.categories))
+            if sig is None or sig.strength != "weak":
+                continue
+            atlas = ["AML.T0048.000"] if sig.category in ("financial_crime", "fraud") else ["AML.T0048.003"]
+            if question is None or not hc.judge.enabled or not self._judge_enabled(ctx):
+                out.append(self._finding(
+                    "harmful_content", "signal", Action.LOG,
+                    f"The message touches on {CATEGORY_LABEL[sig.category]} ({sig.why}); it needed a T2 review but the "
+                    "judge or its harm question is disabled, so it was recorded only.",
+                    tier="T0", severity="low", evidence=sig.evidence, atlas=atlas,
+                    direction=seg.direction, source=seg.source, location=seg.location,
+                ))
+                continue
+            ctx.escalated = True
+            res = await self._judge_call(ctx, {"USER_MESSAGE": _clip(text, 2000)},
+                                         {"harm": question.model_dump(exclude_none=True)}, "harm_signal")
+            if res is None:
+                continue
+            if res.get("error"):
+                out.append(self._judge_failure(ctx, "harmful_content", res["error"], seg))
+                continue
+            p_yes = float(((res.get("answers") or {}).get("harm") or {}).get("yes", 0.0))
+            if p_yes >= hc.judge.block_above:
+                act, verb = Action.BLOCK, "blocked"
+            elif p_yes >= hc.judge.approval_above:
+                act, verb = Action.REQUIRE_APPROVAL, "held for approval"
+            else:
+                continue
+            out.append(self._finding(
+                "harmful_content", "judge", act,
+                f"T2 judge ({res.get('backend')}) rated the message as a request for help with "
+                f"{CATEGORY_LABEL[sig.category]} with p={p_yes:.2f} (T0 signal: {sig.why}); {verb}. The assistant does "
+                "not help with that; questions about detecting, preventing or reporting it are allowed.",
+                tier="T2", severity="high", score=p_yes, evidence=sig.evidence, atlas=atlas,
+                direction=seg.direction, source=seg.source, location=seg.location,
+            ))
         return out
 
     async def _judge_injection(self, ctx: RequestCtx, escalate: list[tuple[Segment, str, str, float | None]], pi: Any) -> list[Finding]:

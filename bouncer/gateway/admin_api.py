@@ -119,11 +119,11 @@ DESCRIPTIONS = {
     "supply_chain": "Model source allowlist, trust_remote_code and safetensors rules, MCP server allowlist.",
     "mcp_pinning": "Hash of each MCP tool definition; a changed definition is blocked until re-approved.",
     "approvals": "require_approval creates a request; an approval allows that exact call once, for the same agent and session, within a time window.",
-    "harmful_content": "Judge question on harm categories, answered in the same pass.",
+    "harmful_content": "Money laundering, fraud, phishing, malware, violence, self-harm: blocked at T0 when the aim is explicit (concealment, attack artefact), otherwise asked to the T2 judge; defensive questions pass.",
 }
 
 # Controls whose enforcement code exists in this build (others show as "not implemented").
-IMPLEMENTED = {"auth", "secrets", "pii", "obfuscation", "prompt_injection", "tool_governance", "budgets", "loops", "output_safety", "signatures", "approvals", "supply_chain", "mcp_pinning"}
+IMPLEMENTED = {"auth", "secrets", "pii", "obfuscation", "prompt_injection", "tool_governance", "budgets", "loops", "output_safety", "signatures", "approvals", "supply_chain", "mcp_pinning", "harmful_content"}
 
 
 def _iso(ts: float | None) -> str | None:
@@ -361,6 +361,9 @@ def _control_state(g: Any, cid: str) -> dict[str, Any]:
             elif cid == "pii":
                 settings = dict(cfg.entities)
                 action = "per entity"
+            elif cid == "harmful_content":
+                settings = {"categories": cfg.categories, "judge.block_above": cfg.judge.block_above, "judge.approval_above": cfg.judge.approval_above}
+                directions = ["input"]
             elif cid == "tool_governance":
                 action = cfg.unknown_tool
                 settings = {"side_effect_tools": cfg.side_effect_tools, "lethal_trifecta": cfg.lethal_trifecta.action, "goal_alignment.block_above": cfg.goal_alignment.block_above, "argument_rules": list(cfg.arguments)}

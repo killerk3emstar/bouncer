@@ -16,6 +16,7 @@ const JUDGE_REASONS = {
   t1_grey_zone: 'T1 score in the grey zone',
   non_english: 'text is not in English (T1 is English-only)',
   side_effect_tool: 'side-effect tool call',
+  harm_signal: 'harmful-request signal',
   monitor_async: 'monitor mode (async)',
 };
 
