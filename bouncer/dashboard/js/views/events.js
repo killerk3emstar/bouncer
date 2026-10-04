@@ -66,6 +66,7 @@ export default {
         <button type="button" class="btn" id="pause">Pause</button>
         <button type="button" class="btn" data-export="jsonl" title="Download the audit log as JSON Lines, filtered like the table">Export JSONL</button>
         <button type="button" class="btn" data-export="csv" title="Download the audit log as CSV, filtered like the table">Export CSV</button>
+        <button type="button" class="btn" data-export="ocsf.jsonl" title="Download the audit log as OCSF 1.3.0 Detection Findings for a SIEM, filtered like the table">Export OCSF</button>
       </div>
       <form class="toolbar" id="filters" autocomplete="off">
         <label class="field"><span>Action</span><select name="action"><option value="">any</option>${ACTIONS.map((a) => html`<option value="${a}">${ACTION_LABEL[a]}</option>`)}</select></label>

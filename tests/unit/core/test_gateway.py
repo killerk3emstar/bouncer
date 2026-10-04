@@ -438,6 +438,8 @@ def test_audit_exports_follow_the_contract(tmp_path: Path) -> None:
     assert lines[0].startswith("ts,seq,trace_id,type,principal,team") and len(lines[0].split(",")) == 26
     assert len([x for x in lines[1:] if x]) == 1
     assert asyncio.run(get("/api/export/audit.csv?from=2000-01-01T00:00:00Z&to=2000-01-02T00:00:00Z")).text.count("\r\n") == 1
+    ocsf = [json.loads(line) for line in asyncio.run(get("/api/export/audit.ocsf.jsonl")).text.splitlines()]
+    assert len(ocsf) == 2 and {o["class_uid"] for o in ocsf} == {2004} and {o["action"] for o in ocsf} == {"Allowed", "Denied"}
     bad = asyncio.run(get("/api/export/audit.jsonl?from=yesterday"))
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "export.bad_timestamp"
 

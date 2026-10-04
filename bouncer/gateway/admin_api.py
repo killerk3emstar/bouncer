@@ -20,7 +20,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from bouncer.audit import csv_header, csv_line, event_epoch, now_iso
+from bouncer.audit import csv_header, csv_line, event_epoch, now_iso, to_ocsf
 from bouncer.gateway.openai_proxy import gw, handle_chat
 from bouncer.policy.compiled import CONTROL_CATALOG
 from bouncer.policy.profiles import PROFILE_NOTES
@@ -1084,6 +1084,18 @@ async def export_csv(request: Request) -> Any:
             yield csv_line(ev)
 
     return StreamingResponse(body(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{_export_name("csv")}"'})
+
+
+@router.get("/api/export/audit.ocsf.jsonl")
+async def export_ocsf(request: Request) -> Any:
+    """The whole matching log as OCSF 1.3.0 Detection Findings, one JSON object per line, for a SIEM."""
+    g = gw(request)
+    try:
+        filters = _export_filters(request)
+    except ValueError as exc:
+        return _bad_export(exc)
+    lines = (json.dumps(to_ocsf(ev), ensure_ascii=False, default=str) + "\n" for _, ev in g.audit.export(**filters))
+    return StreamingResponse(lines, media_type="application/x-ndjson", headers={"Content-Disposition": f'attachment; filename="{_export_name("ocsf.jsonl")}"'})
 
 
 @router.get("/reports/summary")

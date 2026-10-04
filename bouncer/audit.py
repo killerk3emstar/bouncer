@@ -300,6 +300,99 @@ def to_csv(events: list[dict[str, Any]]) -> str:
     return csv_header() + "".join(csv_line(ev) for ev in events)
 
 
+# OCSF 1.3.0 Detection Finding (class_uid 2004) with the security_control profile; enum values checked
+# against https://schema.ocsf.io/api/1.3.0/classes/detection_finding.
+OCSF_VERSION = "1.3.0"
+_OCSF_SEVERITY = {"info": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
+_OCSF_SEVERITY_NAME = {1: "Informational", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
+# action -> (action_id, action, disposition_id, disposition)
+_OCSF_ACTION = {
+    "allow": (1, "Allowed", 1, "Allowed"),
+    "log": (1, "Allowed", 17, "Logged"),
+    "redact": (1, "Allowed", 99, "Redacted"),
+    "require_approval": (2, "Denied", 14, "Delayed"),
+    "block": (2, "Denied", 2, "Blocked"),
+}
+
+
+def to_ocsf(ev: dict[str, Any], product_version: str = "0.1.0") -> dict[str, Any]:
+    """One audit event as an OCSF Detection Finding. Bouncer-specific fields go to `unmapped.bouncer`."""
+    findings = ev.get("findings") or []
+    sev = max((_OCSF_SEVERITY.get(str(f.get("severity")), 0) for f in findings), default=1) or 1
+    action = str(ev.get("action") or ("block" if ev.get("type") in ("policy.reload_failed", "feed.rejected") else "allow"))
+    action_id, action_name, disp_id, disp = _OCSF_ACTION.get(action, (0, "Unknown", 0, "Unknown"))
+    top = top_finding(findings)
+    kind = ev.get("type", "decision")
+    title = top or (kind if kind != "decision" else f"Request {action_name.lower()}")
+    principal = ev.get("principal") or {}
+    owasp = sorted({o for f in findings for o in (f.get("owasp_llm") or []) + (f.get("owasp_agentic") or [])})
+    atlas = sorted({a for f in findings for a in (f.get("atlas") or [])})
+    t = int(event_epoch(ev) * 1000)
+    return {
+        "category_uid": 2,
+        "category_name": "Findings",
+        "class_uid": 2004,
+        "class_name": "Detection Finding",
+        "activity_id": 1,
+        "activity_name": "Create",
+        "type_uid": 200401,
+        "type_name": "Detection Finding: Create",
+        "time": t,
+        "severity_id": sev,
+        "severity": _OCSF_SEVERITY_NAME[sev],
+        "status_id": 1,
+        "status": "New",
+        "action_id": action_id,
+        "action": action_name,
+        "disposition_id": disp_id,
+        "disposition": disp,
+        "message": ev.get("message") or next((f.get("message") for f in findings if f.get("id") == top), None) or title,
+        "finding_info": {
+            "uid": ev.get("trace_id") or f"seq-{ev.get('seq')}",
+            "title": title,
+            "types": [f.get("id") for f in findings if f.get("id")] or [kind],
+            "created_time": t,
+        },
+        "metadata": {
+            "version": OCSF_VERSION,
+            "profiles": ["security_control"],
+            "product": {"name": "Bouncer", "vendor_name": "Bouncer", "version": product_version},
+            "log_name": "audit",
+            "uid": ev.get("hash"),
+            "original_time": ev.get("ts"),
+        },
+        "unmapped": {
+            "bouncer": {
+                "type": kind,
+                "seq": ev.get("seq"),
+                "principal": principal.get("id") if isinstance(principal, dict) else principal,
+                "team": principal.get("team") if isinstance(principal, dict) else None,
+                "session_id": ev.get("session_id"),
+                "route": ev.get("route"),
+                "direction": ev.get("direction"),
+                "model": ev.get("model"),
+                "upstream": ev.get("upstream"),
+                "enforced": ev.get("enforced"),
+                "status_code": ev.get("status_code"),
+                "policy_version": (ev.get("policy") or {}).get("version"),
+                "approval_id": ev.get("approval_id"),
+                "owasp": owasp,
+                "mitre_atlas": atlas,
+                "findings": [
+                    {k: f.get(k) for k in ("id", "action", "effective_action", "severity", "score", "tier", "message", "evidence", "signature_id")}
+                    for f in findings
+                ],
+                "judge_invoked": (ev.get("judge") or {}).get("invoked"),
+                "latency_ms": ev.get("latency_ms"),
+                "cost_usd": (ev.get("usage") or {}).get("cost_usd"),
+                "excerpt": ev.get("excerpt"),
+                "prev_hash": ev.get("prev_hash"),
+                "hash": ev.get("hash"),
+            }
+        },
+    }
+
+
 def verify_file(path: str | Path) -> dict[str, Any]:
     """Verify the hash chain of an audit file. Returns ok, lines checked and the first problem."""
     prev = GENESIS

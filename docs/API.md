@@ -854,7 +854,7 @@ Body `{}`. Runs the offline YAML case suite (same cases as `make test`, fake T1/
 
 ## 5. Export formats
 
-`GET /api/export/audit.jsonl` and `GET /api/export/audit.csv` accept the filters of 4.2 (`action`, `control`, `principal`, `route`, `q`) plus optional `from` and `to` (ISO timestamps). No `limit`: stream the whole matching log, oldest first. Send `Content-Disposition: attachment; filename="bouncer-audit-<UTC timestamp>.<ext>"`.
+`GET /api/export/audit.jsonl`, `GET /api/export/audit.csv` and `GET /api/export/audit.ocsf.jsonl` accept the filters of 4.2 (`action`, `control`, `principal`, `route`, `q`) plus optional `from` and `to` (ISO timestamps). No `limit`: stream the whole matching log, oldest first. Send `Content-Disposition: attachment; filename="bouncer-audit-<UTC timestamp>.<ext>"`.
 
 - JSONL: `application/x-ndjson`, the audit lines unchanged (so `make verify-audit` works on an unfiltered export).
 - CSV: `text/csv; charset=utf-8`, RFC 4180 quoting, CRLF line ends, header row with these columns in this order:
@@ -863,7 +863,9 @@ Body `{}`. Runs the offline YAML case suite (same cases as `make test`, fake T1/
 ts,seq,trace_id,type,principal,team,session_id,route,direction,model,upstream,action,enforced,status_code,top_finding,findings,owasp,judge_invoked,latency_total_ms,gateway_overhead_ms,cost_usd,policy_version,approval_id,excerpt,prev_hash,hash
 ```
 
-`top_finding` = finding id with the strongest action, then highest severity, then highest score. `findings` = all finding ids joined with `;`. `owasp` = distinct LLM and ASI ids joined with `;`. Booleans as `true` / `false`, nulls as empty cells.
+`top_finding` = finding id with the strongest action, then highest severity, then highest score.
+
+OCSF: one OCSF 1.3.0 Detection Finding per line (`class_uid` 2004, `category_uid` 2, `activity_id` 1, `type_uid` 200401, `metadata.profiles: ["security_control"]`). `severity_id` is the highest finding severity (1 Informational when there is none). `action_id` / `disposition_id`: allow 1/1 (Allowed), log 1/17 (Logged), redact 1/99 (`disposition: "Redacted"`), require_approval 2/14 (Delayed), block 2/2 (Blocked). `finding_info.uid` is the trace id, `finding_info.title` the top finding, `finding_info.types` all finding ids. Everything Bouncer-specific (principal, team, session, route, OWASP and MITRE ATLAS ids, findings with messages, latency, cost, hash chain) is under `unmapped.bouncer`. `findings` = all finding ids joined with `;`. `owasp` = distinct LLM and ASI ids joined with `;`. Booleans as `true` / `false`, nulls as empty cells.
 
 ---
 

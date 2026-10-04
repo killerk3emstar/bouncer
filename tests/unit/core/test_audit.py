@@ -144,3 +144,26 @@ def test_csv_has_the_contract_columns(tmp_path: Path) -> None:
     assert r["top_finding"] == "secrets.jwt" and r["findings"] == "pii.EMAIL;secrets.jwt"
     assert r["owasp"] == "ASI03;LLM02" and r["enforced"] == "true" and r["judge_invoked"] == "false"
     assert r["team"] == "operations" and r["gateway_overhead_ms"] == "4.0" and r["approval_id"] == ""
+
+
+def test_ocsf_detection_finding_mapping(tmp_path: Path) -> None:
+    # OCSF 1.3.0 Detection Finding, security_control profile (validated with schema.ocsf.io/1.3.0/api/v2/validate)
+    from bouncer.audit import to_ocsf
+
+    log = AuditLog(tmp_path / "a.jsonl")
+    ev = log.write({
+        "type": "decision", "trace_id": "tr_1", "action": "redact", "principal": {"id": "ops-copilot", "team": "operations"},
+        "findings": [{"id": "pii.EMAIL", "action": "redact", "severity": "medium", "score": 1.0, "owasp_llm": ["LLM02"], "atlas": ["AML.T0057"]}],
+    })
+    o = to_ocsf(ev)
+    for key in ("activity_id", "category_uid", "class_uid", "finding_info", "metadata", "severity_id", "time", "type_uid", "action_id"):
+        assert key in o
+    assert (o["class_uid"], o["category_uid"], o["type_uid"], o["activity_id"]) == (2004, 2, 200401, 1)
+    assert o["severity_id"] == 3 and o["action_id"] == 1 and o["disposition"] == "Redacted"
+    assert o["finding_info"] == {"uid": "tr_1", "title": "pii.EMAIL", "types": ["pii.EMAIL"], "created_time": o["time"]}
+    assert o["metadata"]["version"] == "1.3.0" and o["metadata"]["product"]["vendor_name"] == "Bouncer"
+    assert o["unmapped"]["bouncer"]["mitre_atlas"] == ["AML.T0057"] and o["unmapped"]["bouncer"]["hash"] == ev["hash"]
+    blocked = to_ocsf({**ev, "action": "block"})
+    assert (blocked["action_id"], blocked["disposition_id"]) == (2, 2)
+    held = to_ocsf({**ev, "action": "require_approval"})
+    assert (held["action_id"], held["disposition_id"]) == (2, 14)
