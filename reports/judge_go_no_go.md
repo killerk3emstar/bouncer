@@ -23,7 +23,7 @@ measurements (see "Conditions" under Latency).
    third one `timeout` (measured: 1477 ms, 2972 ms, timeout at 4001 ms). That is handled by `fail_mode`, but it is
    another reason to call T2 only for escalations.
 
-The PLAN section 5 fallback rule does not trigger: median latency is under 4 s for the states the gateway should
+The fallback rule (switch to Llama Guard if Clef is too slow or less accurate) does not trigger: median latency is under 4 s for the states the gateway should
 send (1.1 to 2.0 s up to ~300 state tokens), and Clef is more accurate than Llama Guard on every question.
 
 `ollama-guard` (Llama Guard 3 1B) stays as the fallback for machines without Apple Silicon (`cpu-judge` profile),

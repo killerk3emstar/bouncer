@@ -1,6 +1,6 @@
 # Bouncer: measured numbers for the slides
 
-Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 3.12.11), on 2026-10-04 between 00:00 and 02:00, with the machine shared with another project. Source file for each number in brackets.
+Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 3.12.11), on 2026-10-04 between 00:00 and 07:10, with the machine shared with another project. Source file for each number in brackets.
 
 ## Tests (slide: proof)
 
@@ -17,8 +17,8 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 
 | Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
 |---|---|---|---|---|
-| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.6 / 1.1 ms |
-| T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 11.8 / 22.0 ms |
+| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.7 / 1.3 ms |
+| T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 11.8 / 22.7 ms |
 | Full pipeline T0 + T1 + T2 | 98.5% | 66.0% | 1.0% | 16.4 / 846 ms (p95 0.8 to 1.6 s over four runs on the shared machine) |
 
 - On the bank-operations set alone: 119 of 134 attacks stopped (89%), 2 false positives in 144 benign prompts (1.4%).
@@ -47,13 +47,13 @@ Clef-flash (Cloudflare, Apache 2.0), MLX 4-bit, one forward pass answers several
 - Gateway overhead p50: 10.5 ms for a short prompt, 83.8 ms for a 2 KB prompt; 0.2 ms when the same prompt repeats (cached). T1 is 86 to 95% of it; T0 is 0.3 to 3.5 ms.
 - Throughput with T1: 187 to 195 requests per second at 8 to 32 concurrent clients, p95 107 ms at 32 clients. Without T1: about 580 requests per second.
 - Allowing 3 concurrent T1 inferences instead of 1 doubled throughput (95 to 187 req/s) and cut p95 at 32 clients from 2.2 s to 98 ms.
-- MCP gateway: about 5 to 8 ms overhead per tool call without the judge (one-off measurements on the live stack, not in a report); about 1.9 s when the judge is called for a side-effect tool.
+- MCP gateway: about 5 to 8 ms overhead per tool call (7.7 ms p50 in one run) without the judge (one-off measurements on the live stack, not in a report); about 1.9 s when the judge is called for a side-effect tool.
 
 ## T1 classifier facts (slide: three layers, honest limits)
 
 [reports/t1.md, reports/eval.md]
 
-- 15 to 17 ms for a short message, about 0.5 s for a 1000-token page, on CPU.
+- 10 to 17 ms for a short message, about 0.5 s for a 1000-token page, on CPU.
 - English only. On our bank-operations benign prompts it flags 26% at threshold 0.5 (Polish hard negatives up to 67%), and it is at chance level on indirect injections in tool results (AUC 0.48 on the judge's labeled set). That is why T1 never blocks on its own in the default profile; it routes text to the judge.
 
 ## Security bugs we found in our own code and fixed (slide: optional, credibility)

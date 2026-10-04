@@ -49,8 +49,9 @@ thread, so requests are served one at a time in arrival order.
 
 Answer keys: `noul` -> `yes`/`no`; `score` with named criteria -> the names in the given order; `score` with a
 list -> `"0"`, `"1"`, ...; `choice` -> the criteria keys. Probabilities sum to 1 per question.
-`input_tokens` and `truncated` are additions to the PLAN contract; `truncated: true` means the judge saw only the
-head and tail of a long UNTRUSTED_CONTENT, so a "no" is weaker evidence.
+`input_tokens` and `truncated` are additions to the interface above; `truncated: true` means the judge saw only the
+head and tail of a long UNTRUSTED_CONTENT, so a "no" is weaker evidence (the gateway sends untrusted content longer than
+2,000 characters in overlapping windows, so this is rare).
 
 Errors: `{"error": {"type": "judge_error", "code": ..., "message": ...}}` with 422 `invalid_questions`,
 413 `state_too_large`, 503 `loading` / `backend_unavailable` / `busy`, 502 `backend_error`.

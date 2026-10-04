@@ -172,8 +172,7 @@ docker compose down                   # add -v to delete the audit log volume
 ```
 
 Measured: first `docker compose build` 82 s including base image download, runtime image 729 MB;
-`docker compose run --rm tests` ran 1,061 tests (the count at the time) in 9.3 s (pytest time) in a container
-with `network_mode: none`.
+`docker compose run --rm tests` runs the offline suite in a container with `network_mode: none` (counts below).
 
 How the container stack differs from `make dev`:
 
@@ -215,7 +214,7 @@ How the container stack differs from `make dev`:
 Checked from a fresh clone of the public repository on 2026-10-04 (Docker Desktop 29.8 on an Apple M4 Pro,
 Linux containers): `docker compose up -d --build` brought gateway, mock, mcp and feed to healthy; `make demo`
 against the containers passed 12 of 12 scenarios (fake T1 and judge, no model files); `docker compose run --rm tests`
-passed 1215 of 1216 tests in 10.7 s (the MLX-only test is skipped). If you built the `tests` image earlier, rebuild it
+passed 1215 of 1216 tests in 10.7 s; after the later changes the same run passed 1230 of 1231 in 12.8 s (the MLX-only test is skipped in both). If you built the `tests` image earlier, rebuild it
 (`docker compose --profile tests build tests`), because `run` reuses an existing image.
 
 The `cpu-judge` profile also runs end to end (`BOUNCER_DOCKER_JUDGE= docker compose --profile cpu-judge up -d`,

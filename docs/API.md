@@ -141,10 +141,10 @@ The dashboard shows `error.message` next to the HTTP status. Use 400/422 for bad
 | `approval_id` | added | Set when the event created an approval request. |
 | `latency_ms.total` | added | `gateway_overhead + upstream`. `gateway_overhead` is everything Bouncer added, including T0, T1 and T2. |
 | `findings[].reason` | added | One sentence: what matched and which threshold or rule applied. Shown in the trace. |
-| `findings[].span` | as PLAN | `[start, end]` character offsets in the scanned text, or `null`. |
-| `findings[].evidence` | as PLAN | Masked evidence only (`AKIA************MPLE`), or `null`. Never raw secrets or PII. |
-| `judge` | as PLAN | Always an object. When T2 did not run: `{"invoked": false, "reason": null, "backend": null, "answers": {}, "latency_ms": 0, "cached": false}`. `reason` is one of `t1_grey_zone`, `non_english`, `side_effect_tool`, `harm_signal`, `monitor_async`. `answers` maps question name to `{option: probability}`. |
-| `usage.budget_left_usd` | as PLAN | Team budget left today after this request, `null` if not applicable. |
+| `findings[].span` | as specified | `[start, end]` character offsets in the scanned text, or `null`. |
+| `findings[].evidence` | as specified | Masked evidence only (`AKIA************MPLE`), or `null`. Never raw secrets or PII. |
+| `judge` | as specified | Always an object. When T2 did not run: `{"invoked": false, "reason": null, "backend": null, "answers": {}, "latency_ms": 0, "cached": false}`. `reason` is one of `t1_grey_zone`, `non_english`, `side_effect_tool`, `harm_signal`, `monitor_async`. `answers` maps question name to `{option: probability}`. |
+| `usage.budget_left_usd` | as specified | Team budget left today after this request, `null` if not applicable. |
 
 One trace can produce several events (for example input scan and output scan of the same request); they share `trace_id` and are ordered by `seq`.
 
@@ -781,7 +781,7 @@ Response 200 (also for blocked requests; the block is data, not an HTTP error):
 }
 ```
 
-Allowed request: `"action": "allow"`, `"status_code": 200`, `"reply": "<assistant text after output checks>"`, `"block": null`, `"upstream_called": true`. `block` is the `error` object of the proxy's 403/429/401 body (PLAN.md section 3). `events` are all audit events of the trace. `latency_ms` is end-to-end.
+Allowed request: `"action": "allow"`, `"status_code": 200`, `"reply": "<assistant text after output checks>"`, `"block": null`, `"upstream_called": true`. `block` is the `error` object of the proxy's 403/429/401 body. `events` are all audit events of the trace. `latency_ms` is end-to-end.
 
 ### 4.15 GET /api/scenarios
 
@@ -881,7 +881,7 @@ OCSF: one OCSF 1.3.0 Detection Finding per line (`class_uid` 2004, `category_uid
 
 **Risk status**: `covered` if at least one cell is `covered` and the mapping does not mark the risk as only partially addressable; `partial` if the best cell is `partial` (or the risk note says only part of it is addressed); `none` if there are no cells or all cells are `none`. The fixture marks LLM04, LLM08, ASI03, ASI06, ASI08, ASI09, ASI10 as partial and LLM09, ASI07 as not covered. The backend (`COVERAGE_MAP` in `bouncer/gateway/admin_api.py`) now marks LLM04, LLM08, ASI03, ASI07, ASI08, ASI09, ASI10 as partial and LLM09 as not covered (ASI06 is covered by the memory-write checks, ASI07 is partial: the A2A route checks messages both ways and delegation is checked, but messages are not signed end to end); with the shipped policy the live posture score is 78 (12 covered, 7 partial, 1 not covered).
 
-**Posture score** = `round(100 * (covered + 0.5 * partial) / 20)`. Disabling a control or switching it to monitor lowers the score on the next request, which is what the jury will try.
+**Posture score** = `round(100 * (covered + 0.5 * partial) / 20)`. Disabling a control or switching it to monitor lowers the score on the next request.
 
 **Official risk names** (verified on genai.owasp.org, 2026-10-03):
 
@@ -939,7 +939,7 @@ Fixture sets: `?fixtures=empty` (no traffic, no approvals, no signatures), `?fix
 - Never put raw secrets or PII into any field above, including `tool.arguments`, approval `arguments`, `message` and `excerpt`. The dashboard has no way to tell.
 - The block messages in fixtures follow the rule "which rule fired, why, what to do next" and end with the trace id; please keep that style in the real `message` and `block.message`.
 - Fixture scenario 3 assumes that an injection found in a **tool result** is only recorded (`log`) and that the following `mail.send` to an external domain is held for approval. The shipped policy does not work that way: injection heuristics block a tool result (`prompt_injection.heuristics.action: block`), the judge blocks at P(yes) >= 0.50, and `mail.send` to a domain outside `bank.example` is `block`. The real scenario `s3-indirect-injection-trifecta` therefore ends with `block` at the tool result; the approval flow (lethal trifecta, `require_approval`) is shown by `s3e-trifecta-approval` with a transfer.
-- `GET /api/controls` must list controls that are missing from the policy as disabled; that is how a deleted section becomes visible to the jury.
+- `GET /api/controls` must list controls that are missing from the policy as disabled; that is how a deleted section becomes visible to the operator.
 
 ## 9. Agent-to-agent route (A2A)
 

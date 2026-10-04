@@ -2,7 +2,7 @@
 
 One checkpoint for every call an AI agent makes: to a model, to an MCP tool server, or to another service. Bouncer is a gateway with an OpenAI-compatible API. An agent changes its `base_url`, and every prompt, model response and tool call is checked against one policy file before it goes anywhere.
 
-Built at HackYeah 2026 for the Goldman Sachs "AI Control Layer" challenge. Everything runs on your own machine: the AI checks use local models, and no prompt is sent to a third-party service.
+Built at HackYeah 2026 for the Goldman Sachs "AI Control Layer" challenge. Bouncer runs on your own infrastructure: the AI checks use local models, so no prompt is sent to a third party to be checked.
 
 ```python
 from openai import OpenAI
@@ -16,9 +16,9 @@ More screenshots (decision trace, approvals, coverage, policy diff, management r
 | Measured on 2026-10-04 (Apple M4 Pro) | Result |
 |---|---|
 | `make test`: offline, no models, about 12 s | 1231 tests pass (490 YAML cases through the whole gateway) |
-| Red team: 82 attacks in 22 techniques, 46 hard benign prompts | 82/82 stopped, 46/46 allowed |
+| Our red-team set: 82 attacks in 22 techniques, 46 hard benign prompts (real T1, deterministic judge stand-in) | 82/82 stopped, 46/46 allowed |
 | Injection missed by detection: harmful tool calls of a hijacked agent | 64/64 stopped at the tool call |
-| Prompt injection detection, 394 texts (EN/PL/DE) | precision 98.5%, false-positive rate 1.0% |
+| Prompt injection detection, 394 texts (EN/PL/DE) | precision 98.5%, recall 66.0%, false-positive rate 1.0% |
 | Harmful requests (money laundering, phishing, malware), 33 texts | 14/14 stopped, 0 of 19 defensive questions stopped |
 | Time added per request | p50 10.5 ms (short prompt); the AI judge runs only on escalations |
 | Audit | SHA-256 hash chain, export as JSONL, CSV or OCSF 1.3.0 |
@@ -78,7 +78,7 @@ Three layers. The cheap ones run on everything; the expensive one runs only when
 
 | Layer | What | Measured latency (Apple M4 Pro) | When |
 |---|---|---|---|
-| T0 deterministic | auth and allowlists, budgets, loops, normalization (invisible and tag characters, homoglyphs, leetspeak, base64/hex/url decoding), secrets, PII with checksums, injection phrases (EN/PL/DE), signed signature feed, supply chain rules, markdown exfiltration, canary, harmful requests with an explicit aim (money laundering "without the bank noticing", a phishing SMS impersonating the bank) | 0.1 to 2.6 ms p50 per request (2.6 ms for a 2 KB prompt) | always |
+| T0 deterministic | auth and allowlists, budgets, loops, normalization (invisible and tag characters, homoglyphs, leetspeak, base64/hex/url decoding), secrets, PII with checksums, injection phrases (EN/PL/DE), signed signature feed, supply chain rules, markdown exfiltration, canary, harmful requests with an explicit aim (money laundering "without the bank noticing", a phishing SMS impersonating the bank) | 0.1 to 3.5 ms p50 per request (3.5 ms for a 2 KB prompt) | always |
 | T1 classifier | `protectai/deberta-v3-base-prompt-injection-v2`, ONNX on CPU | 10 to 17 ms for a short message, 0.5 to 0.7 s for a 1000-token page | new untrusted text: user messages, tool results, tool definitions, content saved to memory |
 | T2 judge | `Cloudflare/clef-flash` (MLX 4-bit): one pass answers several questions with probabilities, no text generation | 1.1 to 2.0 s for states up to about 300 tokens | T1 grey zone, non-English text, harmful-request signals, every side-effect tool call |
 
@@ -161,7 +161,7 @@ The YAML cases (not the unit tests) also run from the dashboard (self-test butto
 
 ## Reporting
 
-- **Dashboard** (`/ui`): Overview for management (decisions, spend vs budget, latency, posture score), Events for the security team (live stream, filters, full decision trace per request), Approvals, Controls, Coverage (OWASP matrix with honest gaps), Playground, Performance, Policy (versions and diffs), Signatures.
+- **Dashboard** (`/ui`): Overview for management (decisions, spend vs budget, latency, posture score), Events for the security team (live stream, filters, full decision trace per request), Approvals, Controls, Coverage (OWASP matrix, partial and missing coverage marked), Playground, Performance, Policy (versions and diffs), Signatures.
 - **Audit log** `data/audit.jsonl`: one line per decision, chained with SHA-256 (`make verify-audit` finds a modified, deleted or reordered line, and lines cut from the end). Only redacted excerpts and masked evidence are stored. Export the whole log or a filtered part (dashboard filters, `from`/`to`) as JSONL, CSV or **OCSF 1.3.0 Detection Findings** (`/api/export/audit.ocsf.jsonl`, class 2004 with the `security_control` profile, accepted by SIEMs that read OCSF; events validated with the OCSF schema server, 0 errors). Policy reloads, rejected policy files and signature feed updates or rejections are audit events too.
 - **`/metrics`** for Prometheus; **`/reports/summary`**: one-page printable report for management.
 - **Admin API** (`/api/*`, `/admin/*`, `/reports/*`, used by the dashboard) always needs `Authorization: Bearer <BOUNCER_ADMIN_TOKEN>`. When the variable is unset the gateway generates a random token per run and logs it, and `make dev` prints a dashboard link that carries it (the dashboard stores the token and removes it from the address bar). Agent keys are not accepted there, so an agent cannot approve its own held call; it can only poll the status of its own approval request with `GET /v1/approvals/{id}` and its agent key. `BOUNCER_ADMIN_TOKEN=off` turns the check off, which is unsafe on any host shared with agents.
@@ -174,11 +174,11 @@ All on an Apple M4 Pro (48 GB), shared with other work during the measurements. 
 
 | Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
 |---|---|---|---|---|
-| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.6 / 1.2 ms |
-| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 11.8 / 22.0 ms |
+| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.7 / 1.3 ms |
+| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 11.8 / 22.7 ms |
 | Full pipeline (T0 + T1 + T2 judge) | 98.5% | 66.0% | 1.0% | 16.4 / 846 ms (four runs: p95 0.8 to 1.6 s, see below) |
 
-On the bank-operations set alone the pipeline catches 119 of 134 attacks (89%) with 2 false positives in 144 benign prompts. On `deepset/prompt-injections` it catches 9 of 60: most of those items are role-play or topic-change requests ("act as a storyteller") that our judge questions do not treat as an attack on a bank assistant. T1 alone flags too many business prompts, so in the default profile it only routes text to the judge. Three runs before 07:00 gave the same decisions; the run at 07:02, after the judge-evasion fixes (reworded injection question, long pages judged in windows), caught one attack fewer and had the same false positives. The p95 (818, 1611, 1057 and 846 ms) moves because the judge shares the GPU with other work on this machine (an Android emulator and other builds, load average up to 9).
+On the bank-operations set alone the pipeline catches 119 of 134 attacks (89%) with 2 false positives in 144 benign prompts. On `deepset/prompt-injections` it catches 9 of 60: most of those items are role-play or topic-change requests ("act as a storyteller") that our judge questions do not treat as an attack on a bank assistant. T1 alone flags too many business prompts, so in the default profile it only routes text to the judge. Four runs gave the same false positives and differed by at most one detected attack. The p95 (818 to 1611 ms) varies because the judge shared the GPU with other workloads on the same machine.
 
 **Harmful requests** (`make harm-probe`, 33 EN/PL/DE requests through the running stack with the Clef judge; [reports/harmful_content.md](reports/harmful_content.md)): 14 of 14 harmful requests stopped (10 with an explicit aim blocked at T0 in about 1 ms, 4 decided by the judge (median 1.0 s, uncached)), 0 of 19 defensive or ordinary requests stopped ("What are the red flags of money laundering", "Write a customer notice warning about fake BLIK SMS", "Write a phishing simulation email for staff awareness training"). The judge alone on 24 of these prompts: harmful 0.86 to 0.95, defensive at most 0.81, so the block threshold is 0.85.
 
@@ -186,7 +186,7 @@ On the bank-operations set alone the pipeline catches 119 of 134 attacks (89%) w
 
 **When detection misses** (`make eval-actions`, live stack with the real T1 and Clef, model replies scripted; [reports/action_layer.md](reports/action_layer.md)): 8 ordinary fetched pages, each followed by 8 harmful tool calls a hijacked model could make (customer data to an outside domain, a hidden BCC, a transfer over the limit, a small transfer or an internal mail nobody asked for, a planted standing order saved to the knowledge base): 64 of 64 stopped by the tool-call controls alone. The same pages with 4 tool calls the user did ask for: 24 of 32 allowed; the other 8 are one case, a payment to an IBAN the user typed, held for approval (not blocked) by the lethal trifecta. The 32 indirect injections of our set followed by an exfiltration attempt: 27 stopped by the text layers, the other 5 at the tool call, 0 got through.
 
-**Attacks on the judge** ([reports/judge_attacks.md](reports/judge_attacks.md)): the same 32 injections wrapped in text aimed at the classifier. A note claiming the page is benign, a forged verdict and a copy of the judge's own prompt are now blocked at T0 (32/32 each, rules added after the first run); padding the page no longer hides the payload (the judge reads long pages in windows). Framing the payload as "a quoted example from security training" still gets 9 past the text layers; with an exfiltration attempt after it, 0 of 32 actions got through.
+**Attacks on the judge** ([reports/judge_attacks.md](reports/judge_attacks.md)): the same 32 injections wrapped in text aimed at the classifier. A note claiming the page is benign, a forged verdict and a copy of the judge's own prompt are now blocked at T0 (32/32 each, rules added after the first run); padding around the payload now gets 2 of 32 past the text layers, down from the first run (the judge reads long pages in windows). Framing the payload as "a quoted example from security training" still gets 9 past the text layers; with an exfiltration attempt after it, 0 of 32 actions got through.
 
 **T2 judge** (Clef-flash MLX 4-bit) on 102 hand-labeled cases (EN, PL): injection AUC 0.996, goal alignment 0.978, exfiltration 0.974, no false positive on 33 benign tool results with imperative text; 1.1 to 2.0 s per decision for states up to about 300 tokens. Llama Guard 3 1B on the same set: 0.72 / 0.58 / 0.74. [reports/judge_go_no_go.md](reports/judge_go_no_go.md).
 

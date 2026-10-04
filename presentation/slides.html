@@ -52,7 +52,7 @@
   <h1 style="color:var(--mute); font-weight:500;">One checkpoint for every call an AI agent makes</h1>
   <p class="lead" style="margin-top:44px;">A gateway between agents and models, MCP tool servers and other agents.
   One policy file. Deterministic checks first, a local AI judge only when needed.
-  Every decision traced, budgeted and exportable. Nothing leaves your machine.</p>
+  Every decision traced, budgeted and exportable. The checks run locally; no prompt is sent to a third party to be checked.</p>
   <div style="margin-top:60px; font-size:26px;">
     <div><b>Team Paired Interns</b></div>
     <div style="margin-top:10px;" class="mono">github.com/killerk3emstar/bouncer</div>
@@ -132,7 +132,7 @@
   <table style="margin-top:36px;">
     <tr><th style="width:22%">Layer</th><th>What it does</th><th style="width:16%">Latency</th><th style="width:22%">Runs on</th></tr>
     <tr><td><b>T0</b> deterministic</td><td>normalization (invisible characters, homoglyphs, leetspeak, base64/ROT13), secrets, PII with checksums, injection phrases EN/PL/DE, 20 signed signatures, markdown exfiltration, harmful requests</td><td class="n">0.3–3.5 ms</td><td>every request</td></tr>
-    <tr><td><b>T1</b> classifier</td><td>DeBERTa prompt-injection model, ONNX on CPU. English only, 19% false positives alone, so it never blocks in the default profile: it routes text to T2</td><td class="n">15–17 ms</td><td>new untrusted text</td></tr>
+    <tr><td><b>T1</b> classifier</td><td>DeBERTa prompt-injection model, ONNX on CPU. English only, 19% false positives alone, so it never blocks in the default profile: it routes text to T2</td><td class="n">10–17 ms</td><td>new untrusted text</td></tr>
     <tr><td><b>T2</b> judge</td><td>Clef-flash, MLX 4-bit, local. Answers several questions in one forward pass with probabilities; it generates no text, so it cannot be talked into writing "SAFE"</td><td class="n">1.1–2.0 s</td><td>escalations, non-English text, side-effect tool calls</td></tr>
   </table>
   <div class="row" style="margin-top:44px; flex:none;">
@@ -246,8 +246,8 @@ controls:
   </div>
   <table style="margin-top:28px;">
     <tr><th>Prompt injection, 394 texts (EN/PL/DE)</th><th class="n">Precision</th><th class="n">Recall</th><th class="n">False positives</th><th class="n">p50 / p95</th></tr>
-    <tr><td>T0 deterministic only</td><td class="n">98.7%</td><td class="n">39.7%</td><td class="n">0.5%</td><td class="n">0.6 / 1.1 ms</td></tr>
-    <tr><td>T1 classifier alone</td><td class="n">78.0%</td><td class="n">69.6%</td><td class="n">19.0%</td><td class="n">12 / 22 ms</td></tr>
+    <tr><td>T0 deterministic only</td><td class="n">98.7%</td><td class="n">39.7%</td><td class="n">0.5%</td><td class="n">0.7 / 1.3 ms</td></tr>
+    <tr><td>T1 classifier alone</td><td class="n">78.0%</td><td class="n">69.6%</td><td class="n">19.0%</td><td class="n">12 / 23 ms</td></tr>
     <tr><td><b>Full pipeline T0 + T1 + T2</b></td><td class="n"><b>98.5%</b></td><td class="n"><b>66.0%</b></td><td class="n"><b>1.0%</b></td><td class="n">16 ms / 0.8–1.6 s</td></tr>
   </table>
   <p style="margin-top:22px; font-size:22px; color:var(--mute);">On our bank-operations set 89% of attacks stopped, 1.4% false positives. On the public deepset test split only 9 of 60: most are role-play requests our judge does not count as attacks on a bank assistant. We report it anyway. Security bugs we found in our own code during the build are listed in reports/security_review.md, each fixed with a regression test.</p>
