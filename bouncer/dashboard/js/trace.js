@@ -82,7 +82,7 @@ function judgeBlock(j) {
       <div><dt>Cached</dt><dd>${j.cached ? 'yes' : 'no'}</dd></div>
     </dl>
     <div class="judge-answers">${answers.length ? answers : html`<p class="muted">No answers recorded.</p>`}</div>
-    <p class="hint">Probabilities per answer option, returned in one pass. Thresholds are in policy (prompt_injection.judge, tool_governance.goal_alignment).</p>
+    <p class="hint">Probabilities per answer option, returned in one pass. Thresholds are in the policy (prompt_injection.judge, harmful_content.judge, tool_governance.goal_alignment).</p>
   </div>`;
 }
 
