@@ -13,7 +13,7 @@ client = OpenAI(base_url="http://localhost:8700/v1", api_key="<your Bouncer agen
 
 ```bash
 make setup     # uv sync (Python 3.12), creates .env from .env.example
-make test      # offline test suite: 1200 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
+make test      # offline test suite: 1216 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
 make dev       # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704
 ```
 
@@ -159,7 +159,7 @@ On the bank-operations set alone the pipeline catches 120 of 134 attacks (90%) w
 
 **Overhead** (`make bench`, simulated model, 200 requests per scenario; [reports/bench.md](reports/bench.md)): gateway overhead p50 10.8 ms for a short prompt and 83 ms for a 2 KB prompt, of which T1 is 88 to 95%; 0.2 ms for a repeated prompt (cached). Throughput of one worker: about 187 req/s with T1 at 8 to 32 concurrent clients (p95 98 ms at 32 clients), about 620 req/s without it. MCP gateway: 7.7 ms overhead p50 per tool call (measured once during development against the live stack; not part of `make bench`).
 
-**Tests**: `make test` runs 1200 tests (475 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
+**Tests**: `make test` runs 1216 tests (475 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
 
 ## Architecture
 
