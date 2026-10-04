@@ -40,6 +40,30 @@ def judge_is_up(url: str = "http://localhost:8701/health") -> bool:
         return False
 
 
+def judge_is_starting() -> bool:
+    """`make judge` was started but the model is still loading (the port opens only when it is ready)."""
+    try:
+        out = subprocess.run(["pgrep", "-f", "--", "-m judge.server"], capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return out.returncode == 0 and bool(out.stdout.strip())
+
+
+def wait_for_judge(seconds: int = 90) -> bool:
+    if judge_is_up():
+        return True
+    if not judge_is_starting():
+        return False
+    print(f"[dev] T2 judge is loading its model; waiting up to {seconds} s for :8701 ...")
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        time.sleep(1)
+        if judge_is_up():
+            print("[dev] T2 judge is ready.")
+            return True
+    return False
+
+
 def main() -> int:
     os.chdir(ROOT)
     try:
@@ -53,7 +77,7 @@ def main() -> int:
         import secrets
 
         env["BOUNCER_ADMIN_TOKEN"] = "adm_" + secrets.token_urlsafe(18)
-    if "BOUNCER_JUDGE" not in env and not judge_is_up():
+    if "BOUNCER_JUDGE" not in env and not wait_for_judge():
         # Without a judge every escalation would fail closed (blocked). For a first run we use the
         # deterministic stand-in and say so; `make judge` starts the real one.
         env["BOUNCER_JUDGE"] = "fake"
