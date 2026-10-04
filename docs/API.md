@@ -30,8 +30,6 @@ Not implemented as specified here (open items):
 - **Judge reason.** `judge.reason` is `t1_grey_zone`, `non_english` or `side_effect_tool`; `monitor_async` is never
   emitted.
 - **Budgets.** `state` is `ok`, `warning`, `downgraded` (spent; paid requests go to the local model) or `blocked`.
-- **ATLAS ids.** Findings of `tool_governance`, `budgets`, `loops`, `mcp_pinning` and `auth` carry no ATLAS id;
-  `AML.T0053` and `AML.T0010` appear only in the fixtures.
 - **Errors.** Most error bodies have no `code`. Request validation errors from FastAPI are 422 with
   `{"detail": [...]}`.
 - **Latency.** GET endpoints answer in about 1 to 12 ms; the YAML case counts behind `/api/controls` and
@@ -899,7 +897,7 @@ ts,seq,trace_id,type,principal,team,session_id,route,direction,model,upstream,ac
 
 Risk page URLs: `https://genai.owasp.org/llmrisk/<slug>/` with slugs `llm01-prompt-injection`, `llm022025-sensitive-information-disclosure`, `llm032025-supply-chain`, `llm042025-data-and-model-poisoning`, `llm052025-improper-output-handling`, `llm062025-excessive-agency`, `llm072025-system-prompt-leakage`, `llm082025-vector-and-embedding-weaknesses`, `llm092025-misinformation`, `llm102025-unbounded-consumption` (all return HTTP 200). Agentic risks link to `https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/`.
 
-**MITRE ATLAS ids used in fixtures** (checked against `mitre-atlas/atlas-data` `dist/ATLAS.yaml`): `AML.T0051` LLM Prompt Injection (`.000` Direct, `.001` Indirect), `AML.T0054` LLM Jailbreak, `AML.T0057` LLM Data Leakage, `AML.T0053` AI Agent Tool Invocation, `AML.T0010` AI Supply Chain Compromise. Links: `https://atlas.mitre.org/techniques/<id>`.
+**MITRE ATLAS ids used in fixtures** (checked against `mitre-atlas/atlas-data` `dist/ATLAS.yaml`): `AML.T0051` LLM Prompt Injection (`.000` Direct, `.001` Indirect), `AML.T0054` LLM Jailbreak, `AML.T0057` LLM Data Leakage, `AML.T0053` AI Agent Tool Invocation, `AML.T0010` AI Supply Chain Compromise. Links: `https://atlas.mitre.org/techniques/<id>`. Every control except `signatures` (ids per signature) lists its techniques in `/api/controls` `atlas`; findings of controls that do not set their own ids get them from `FINDING_ATLAS` in `bouncer/core.py` (for example `tool_governance.lethal_trifecta`: `AML.T0086` Exfiltration via AI Agent Tool Invocation; `loops`: `AML.T0034.002` Agentic Resource Consumption; `mcp_pinning`: `AML.T0109` AI Supply Chain Rug Pull, `AML.T0110` AI Agent Tool Poisoning; `auth`: `AML.T0012` Valid Accounts). `make test` checks every id in the code, feed, docs and fixtures against the ATLAS 5.6.0 technique list in `tests/unit/core/atlas_techniques.json`.
 
 **Percentiles**: compute from an in-memory ring buffer per layer (for example the last 10 000 samples with timestamps, filtered by window) or from the audit log; label `n` honestly.
 

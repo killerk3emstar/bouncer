@@ -23,7 +23,7 @@ from bouncer.core import Action, Control, Finding, ScanContext, Segment, View
 from bouncer.policy.schema import OutputSafetyCfg
 
 MAX_SCAN_CHARS = 200_000
-ATLAS_EXFIL = ["AML.T0057"]  # LLM Data Leakage
+ATLAS_EXFIL = ["AML.T0077", "AML.T0057"]  # LLM Response Rendering, LLM Data Leakage
 ATLAS_CANARY = ["AML.T0056"]  # Extract LLM System Prompt (both verified in mitre-atlas/atlas-data)
 
 _TITLE = r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'|\([^)\n]*\)))?"

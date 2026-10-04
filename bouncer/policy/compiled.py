@@ -32,20 +32,21 @@ TEXT_CONTROLS: list[tuple[str, str, str]] = [
 ]
 
 # Every control the gateway knows about, for the dashboard and coverage (id -> OWASP mapping).
+# atlas: MITRE ATLAS techniques the control addresses (ATLAS 5.6.0); signatures carry their own per signature
 CONTROL_CATALOG: dict[str, dict[str, Any]] = {
-    "auth": {"title": "Agent authentication and model/tool allowlists", "owasp_llm": ["LLM06"], "owasp_agentic": ["ASI03"], "tier": "T0"},
-    "secrets": {"title": "Secrets detection and redaction", "owasp_llm": ["LLM02"], "owasp_agentic": ["ASI03"], "tier": "T0"},
-    "pii": {"title": "PII detection with checksum validation", "owasp_llm": ["LLM02"], "owasp_agentic": [], "tier": "T0"},
-    "obfuscation": {"title": "Normalization and obfuscation detection", "owasp_llm": ["LLM01"], "owasp_agentic": ["ASI01"], "tier": "T0"},
-    "prompt_injection": {"title": "Prompt injection (heuristics T0, classifier T1, judge T2)", "owasp_llm": ["LLM01"], "owasp_agentic": ["ASI01", "ASI06"], "tier": "T0/T1/T2"},
-    "tool_governance": {"title": "Tool allowlists, argument limits, lethal trifecta, goal alignment", "owasp_llm": ["LLM06", "LLM02"], "owasp_agentic": ["ASI02", "ASI01"], "tier": "T0/T2"},
-    "budgets": {"title": "Budgets, rate limits and model downgrade", "owasp_llm": ["LLM10"], "owasp_agentic": ["ASI08"], "tier": "T0"},
-    "loops": {"title": "Loop and runaway detection with circuit breaker", "owasp_llm": ["LLM10"], "owasp_agentic": ["ASI08"], "tier": "T0"},
-    "output_safety": {"title": "Output safety: markdown exfiltration, HTML, canary", "owasp_llm": ["LLM05", "LLM02", "LLM07"], "owasp_agentic": [], "tier": "T0"},
-    "signatures": {"title": "Historical attack signatures (signed feed)", "owasp_llm": ["LLM01", "LLM03", "LLM05"], "owasp_agentic": ["ASI04", "ASI05"], "tier": "T0"},
-    "supply_chain": {"title": "Supply chain: model sources, trust_remote_code, MCP server allowlist", "owasp_llm": ["LLM03"], "owasp_agentic": ["ASI04"], "tier": "T0"},
-    "mcp_pinning": {"title": "MCP tool definition pinning (rug pull detection)", "owasp_llm": ["LLM03"], "owasp_agentic": ["ASI04"], "tier": "T0"},
-    "approvals": {"title": "Human approval for risky actions", "owasp_llm": ["LLM06"], "owasp_agentic": ["ASI09"], "tier": "-"},
+    "auth": {"title": "Agent authentication and model/tool allowlists", "owasp_llm": ["LLM06"], "owasp_agentic": ["ASI03"], "tier": "T0", "atlas": ["AML.T0012"]},
+    "secrets": {"title": "Secrets detection and redaction", "owasp_llm": ["LLM02"], "owasp_agentic": ["ASI03"], "tier": "T0", "atlas": ["AML.T0055", "AML.T0057"]},
+    "pii": {"title": "PII detection with checksum validation", "owasp_llm": ["LLM02"], "owasp_agentic": [], "tier": "T0", "atlas": ["AML.T0057"]},
+    "obfuscation": {"title": "Normalization and obfuscation detection", "owasp_llm": ["LLM01"], "owasp_agentic": ["ASI01"], "tier": "T0", "atlas": ["AML.T0068"]},
+    "prompt_injection": {"title": "Prompt injection (heuristics T0, classifier T1, judge T2)", "owasp_llm": ["LLM01"], "owasp_agentic": ["ASI01", "ASI06"], "tier": "T0/T1/T2", "atlas": ["AML.T0051", "AML.T0054"]},
+    "tool_governance": {"title": "Tool allowlists, argument limits, lethal trifecta, goal alignment", "owasp_llm": ["LLM06", "LLM02"], "owasp_agentic": ["ASI02", "ASI01"], "tier": "T0/T2", "atlas": ["AML.T0053", "AML.T0086"]},
+    "budgets": {"title": "Budgets, rate limits and model downgrade", "owasp_llm": ["LLM10"], "owasp_agentic": ["ASI08"], "tier": "T0", "atlas": ["AML.T0034", "AML.T0029"]},
+    "loops": {"title": "Loop and runaway detection with circuit breaker", "owasp_llm": ["LLM10"], "owasp_agentic": ["ASI08"], "tier": "T0", "atlas": ["AML.T0034.002"]},
+    "output_safety": {"title": "Output safety: markdown exfiltration, HTML, canary", "owasp_llm": ["LLM05", "LLM02", "LLM07"], "owasp_agentic": [], "tier": "T0", "atlas": ["AML.T0077", "AML.T0057", "AML.T0056"]},
+    "signatures": {"title": "Historical attack signatures (signed feed)", "owasp_llm": ["LLM01", "LLM03", "LLM05"], "owasp_agentic": ["ASI04", "ASI05"], "tier": "T0", "atlas": []},
+    "supply_chain": {"title": "Supply chain: model sources, trust_remote_code, MCP server allowlist", "owasp_llm": ["LLM03"], "owasp_agentic": ["ASI04"], "tier": "T0", "atlas": ["AML.T0010.003", "AML.T0010.005", "AML.T0011.000"]},
+    "mcp_pinning": {"title": "MCP tool definition pinning (rug pull detection)", "owasp_llm": ["LLM03"], "owasp_agentic": ["ASI04"], "tier": "T0", "atlas": ["AML.T0109", "AML.T0110"]},
+    "approvals": {"title": "Human approval for risky actions", "owasp_llm": ["LLM06"], "owasp_agentic": ["ASI09"], "tier": "-", "atlas": ["AML.T0053"]},
 }
 
 

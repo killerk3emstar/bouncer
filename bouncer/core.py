@@ -95,6 +95,31 @@ class View:
         return self.kind == "raw"
 
 
+# MITRE ATLAS techniques for findings whose control does not set its own (checked against
+# mitre-atlas/atlas-data dist/ATLAS.yaml, version 5.6.0). Key: "<control>.<rule>" first, then "<control>".
+FINDING_ATLAS: dict[str, list[str]] = {
+    "auth": ["AML.T0012"],  # Valid Accounts
+    "tool_governance": ["AML.T0053"],  # AI Agent Tool Invocation
+    # Exfiltration via AI Agent Tool Invocation
+    "tool_governance.recipient_domain": ["AML.T0086", "AML.T0053"],
+    "tool_governance.forbidden_field": ["AML.T0086", "AML.T0053"],
+    "tool_governance.lethal_trifecta": ["AML.T0086", "AML.T0053"],
+    "tool_governance.exfiltration": ["AML.T0086", "AML.T0053"],
+    "budgets": ["AML.T0034"],  # Cost Harvesting
+    "budgets.tokens_per_minute": ["AML.T0034", "AML.T0029"],  # + Denial of AI Service
+    "budgets.max_input_tokens": ["AML.T0034.001", "AML.T0029"],  # Resource-Intensive Queries
+    "budgets.max_steps": ["AML.T0034.002"],  # Agentic Resource Consumption
+    "loops": ["AML.T0034.002"],
+    "mcp_pinning": ["AML.T0109", "AML.T0110"],  # AI Supply Chain Rug Pull, AI Agent Tool Poisoning
+    "supply_chain.mcp_server_not_allowed": ["AML.T0010.005"],  # AI Supply Chain Compromise: AI Agent Tool
+    "supply_chain.model_source_not_allowed": ["AML.T0010.003"],  # AI Supply Chain Compromise: Model
+    "supply_chain.trust_remote_code": ["AML.T0011.000"],  # Unsafe AI Artifacts
+    "supply_chain.unsafe_weights_format": ["AML.T0011.000"],
+    "prompt_injection": ["AML.T0051"],  # LLM Prompt Injection (T1 and T2 findings; T0 sets .000 / .001)
+    "output_safety.canary": ["AML.T0056"],  # Extract LLM System Prompt
+}
+
+
 @dataclass(slots=True)
 class Finding:
     """One thing a control detected. id = "<control>.<rule>"."""
@@ -119,6 +144,10 @@ class Finding:
     location: tuple[Any, ...] = ()
     monitor: bool = False  # control (or policy) in monitor mode: recorded, not enforced
     effective_action: Action | None = None
+
+    def __post_init__(self) -> None:
+        if not self.atlas:
+            self.atlas = list(FINDING_ATLAS.get(f"{self.control}.{self.rule}") or FINDING_ATLAS.get(self.control) or [])
 
     @property
     def id(self) -> str:

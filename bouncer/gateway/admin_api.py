@@ -406,7 +406,7 @@ async def controls(request: Request) -> dict[str, Any]:
                 "settings": st["settings"],
                 "owasp_llm": meta.get("owasp_llm", []),
                 "owasp_agentic": meta.get("owasp_agentic", []),
-                "atlas": [],
+                "atlas": meta.get("atlas", []),
                 "tests": {
                     "allow": c["allow"],
                     "block": c["block"],
