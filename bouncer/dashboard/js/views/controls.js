@@ -68,7 +68,7 @@ export default {
               <div class="hint">last ${timeEl(c.triggers && c.triggers.last_triggered)}</div></td>
           </tr>`) : emptyRow(7, 'No controls reported by the gateway.')}</tbody>
         </table></div></div>
-        <p class="hint" style="margin-top:8px">Tests are the YAML cases in tests/cases/ tagged with the control; "block" counts block, redact and approval expectations. Run them with make test or the self-test button in Playground.</p>`);
+        <p class="hint" style="margin-top:8px">Tests are the YAML cases in tests/cases/ tagged with the control; "block" counts block, redact and approval expectations. mcp_pinning is tested with pytest unit tests (tests/unit/mcp/). Run everything with make test; the self-test button in Playground runs the YAML cases.</p>`);
     })();
     return () => { alive = false; };
   },

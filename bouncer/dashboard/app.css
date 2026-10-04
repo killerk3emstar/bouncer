@@ -174,7 +174,11 @@ code, .mono { font-family: var(--mono); font-size: 12px; }
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: 600; }
 
-.shell { display: flex; min-height: calc(100vh - 48px); }
+.shell {
+  display: flex; min-height: calc(100vh - 48px);
+  /* nav column background down the whole page, also in full-page captures and prints */
+  background: linear-gradient(to right, var(--surface) calc(var(--nav-w) - 1px), var(--border) calc(var(--nav-w) - 1px), var(--border) var(--nav-w), transparent var(--nav-w));
+}
 .side {
   position: sticky; top: 48px; align-self: flex-start;
   width: var(--nav-w); flex: 0 0 var(--nav-w); height: calc(100vh - 48px);

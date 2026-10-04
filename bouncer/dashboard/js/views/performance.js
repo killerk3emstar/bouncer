@@ -10,6 +10,10 @@ function tile(label, value, sub) {
   return html`<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || ''}</div></div>`;
 }
 
+// rates span 0.001 to 1000 req/s: keep two significant digits for small values
+const fmtRate = (v) => (v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v >= 0.1 ? v.toFixed(2) : v.toFixed(3));
+const bucketLabel = (s) => (!s ? 'bucket' : s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`);
+
 export default {
   title: 'Performance',
   mount(el) {
@@ -34,7 +38,7 @@ export default {
         ${err ? errorBox(err, 'GET /api/perf') : ''}
         ${p ? html`
         <div class="kpis">
-          ${tile('Throughput now', isNum(thr.current) ? thr.current.toFixed(2) + ' req/s' : '–', `peak ${isNum(thr.peak) ? thr.peak.toFixed(2) : '–'} req/s`)}
+          ${tile('Throughput, last 60 s', isNum(thr.current) ? fmtRate(thr.current) + ' req/s' : '–', `peak ${isNum(thr.peak) ? fmtRate(thr.peak) : '–'} req/s (${bucketLabel(thr.bucket_seconds)} avg)`)}
           ${tile('T2 escalation rate', fmtPct(t2.escalation_rate), `${fmtInt(t2.escalations)} of ${fmtInt(p.requests)} requests`)}
           ${tile('T2 judge cache hit rate', fmtPct(t2.cache_hit_rate, 0), `${fmtInt(t2.cache_hits)} hits · backend ${t2.backend || '–'}`)}
           ${tile('T2 timeouts', fmtInt(t2.timeouts), `fail mode ${t2.fail_mode || '–'}`)}
@@ -60,7 +64,7 @@ export default {
         cleanups.push(mountChart(el.querySelector('#h-' + i), (w) => histogram({ bins: l.histogram || [], width: w, height: 140, label: `${l.label} latency histogram` })));
       });
       const pts = (thr.series || []).map((s) => ({ ts: s.ts, v: s.rps }));
-      cleanups.push(mountChart(el.querySelector('#thr'), (w) => lineChart({ points: pts, width: w, height: 150, yFmt: (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1)), unit: 'req/s', bucketSeconds: thr.bucket_seconds || 3600, aria: 'throughput in requests per second' })));
+      cleanups.push(mountChart(el.querySelector('#thr'), (w) => lineChart({ points: pts, width: w, height: 150, yFmt: fmtRate, unit: 'req/s', bucketSeconds: thr.bucket_seconds || 3600, aria: 'throughput in requests per second' })));
     };
 
     let last = null;
