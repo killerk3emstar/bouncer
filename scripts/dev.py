@@ -1,4 +1,5 @@
-"""Start the local stack: gateway :8700, simulated upstream :8702, demo MCP server :8703, feed server :8704.
+"""Start the local stack: gateway :8700, simulated upstream :8702, demo MCP server :8703, feed server :8704,
+demo A2A agent :8707.
 
 Ctrl-C stops all of them. The judge (:8701) runs separately with `make judge` because it loads a
 large model once and should not restart with the rest.
@@ -20,6 +21,7 @@ SERVICES = [  # name, command, port, file that must exist
     ("mock", [sys.executable, "-m", "demo.mock_upstream"], 8702, "demo/mock_upstream.py"),
     ("mcp", [sys.executable, "-m", "demo.mcp_server"], 8703, "demo/mcp_server.py"),
     ("feed", [sys.executable, "scripts/feed_server.py"], 8704, "scripts/feed_server.py"),
+    ("a2a", [sys.executable, "-m", "demo.a2a_agent"], 8707, "demo/a2a_agent.py"),
 ]
 
 

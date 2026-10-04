@@ -14,7 +14,7 @@ client = OpenAI(base_url="http://localhost:8700/v1", api_key="<your Bouncer agen
 ```bash
 make setup     # uv sync (Python 3.12), creates .env from .env.example
 make test      # offline test suite: 1216 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
-make dev       # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704
+make dev       # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704 + demo A2A agent :8707
 ```
 
 Then open the dashboard link that `make dev` prints (`http://localhost:8700/ui/?token=...`) and, in a second terminal, run the scripted attack scenarios:
@@ -188,7 +188,7 @@ docs/           architecture, threat model, API, running guide
 | 8702 | simulated commercial model API (illustrative prices, no paid API is called) |
 | 8703 | demo MCP server |
 | 8704 | signature feed server (remote feed demo) |
-| 8707 | demo A2A agent "Risk Analyst" (`make a2a-agent`, only for `make a2a-demo GATEWAY=...`) |
+| 8707 | demo A2A agent "Risk Analyst" (started by `make dev`; `make a2a-demo GATEWAY=http://127.0.0.1:8700` sends the demo messages through the running gateway) |
 
 Ollama (11434) is used for local models when present.
 
