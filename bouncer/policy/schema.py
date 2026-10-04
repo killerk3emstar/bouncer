@@ -225,7 +225,8 @@ class CanaryCfg(Strict):
 
 
 class OutputSafetyCfg(ControlCfg):
-    directions: list[DirectionName] = ["output"]
+    # output: every check; tool_result and input: only data-carrying markdown images (removed from tool results, logged in user messages)
+    directions: list[DirectionName] = ["output", "tool_result", "input"]
     markdown_links: MarkdownLinksCfg = MarkdownLinksCfg()
     html: Literal["strip", "block", "log", "allow"] = "strip"
     canary: CanaryCfg = CanaryCfg()

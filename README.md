@@ -74,7 +74,7 @@ So an injection does not have to be recognized to be stopped: the action it trie
 | `prompt_injection`: T0 phrases, T1 classifier, T2 judge; also on content saved to memory | LLM01 | ASI01, ASI06 | block / approval |
 | `tool_governance`: allowlist, arguments, trifecta, goal alignment | LLM06, LLM02 | ASI01, ASI02 | block / approval |
 | `budgets`, `loops`: USD per team and session, tokens per minute, GPU seconds, step limit, breaker | LLM10 | ASI08 | downgrade, then 429 (step limit, input size and the call that trips the loop breaker: 403) |
-| `output_safety`: markdown image/link exfiltration, HTML, system prompt canary | LLM05, LLM02, LLM07 | | redact / block |
+| `output_safety`: markdown image/link exfiltration, HTML, system prompt canary; a data-carrying image in a tool result is removed before the model reads it (EchoLeak setup) | LLM05, LLM02, LLM07 | | redact / block |
 | `signatures`: signed feed of historical attacks (pickle, torch.load, ShadowRay, Probllama, metadata SSRF, tool poisoning, ...) | LLM01, LLM03, LLM05 | ASI04, ASI05 | block |
 | `supply_chain`: model source allowlist, trust_remote_code, pickle weights | LLM03 | ASI04 | block |
 | `mcp_pinning`: MCP tool definition hashes (rug pull), server allowlist | LLM03 | ASI04 | block until re-approved |

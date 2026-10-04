@@ -154,12 +154,41 @@ class OutputSafetyControl(Control):
         findings: list[Finding] = []
         if segment.direction == "output":
             findings.extend(self._markup(raw, segment))
+        elif segment.direction == "tool_result" or (segment.direction == "input" and segment.role == "user"):
+            findings.extend(self._inbound_images(raw, segment))
         canary = getattr(ctx, "canary", None) if ctx is not None else None
         if canary and self.canary_action is not None:
             f = self._canary(raw, views, canary, segment)
             if f is not None:
                 findings.append(f)
         return findings
+
+    def _inbound_images(self, text: str, segment: Segment) -> list[Finding]:
+        """A markdown image that would send data to a foreign host, found before the model reads the text.
+
+        In a tool result it is the EchoLeak setup (a page tells the model to render it), so it is removed before
+        the model sees it. In a user message it is logged. Either way the model's answer is checked again."""
+        if "](" not in text and "]:" not in text and "<img" not in text.lower():
+            return []
+        out = []
+        for f in self._markup(text, segment):
+            if f.rule != "markdown-image" or f.severity != "critical":
+                continue  # only data-carrying images; links and HTML in inbound text are normal
+            if segment.direction == "tool_result":
+                f.action = Action.REDACT
+                f.message = (
+                    f"{f.message.split(' was removed from')[0].split(' is in the model')[0]} in {segment.source or 'a tool result'} "
+                    "was removed before the model read it: content that asks the model to render an image with data in "
+                    "its URL is the EchoLeak exfiltration pattern. The model's answer is checked again."
+                )
+            else:
+                f.action = Action.LOG
+                f.message = (
+                    f"{f.message.split(' was removed from')[0].split(' is in the model')[0]} in the user message was logged; "
+                    "if the model repeats it, it is removed from the answer (output_safety.markdown_links.images)."
+                )
+            out.append(f)
+        return out
 
     def _markup(self, text: str, segment: Segment) -> list[Finding]:
         if "](" not in text and "<" not in text and "]:" not in text and "://" not in text:
