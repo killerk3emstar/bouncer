@@ -13,7 +13,7 @@ client = OpenAI(base_url="http://localhost:8700/v1", api_key="<your Bouncer agen
 
 ```bash
 make setup     # uv sync (Python 3.12), creates .env from .env.example
-make test      # offline test suite: 1169 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
+make test      # offline test suite: 1200 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
 make dev       # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704
 ```
 
@@ -27,11 +27,12 @@ The same scenarios are buttons in the dashboard Playground.
 
 The AI layers are optional for the steps above: without model files the gateway uses a deterministic stand-in for T1, and when no judge answers on :8701, `make dev` starts the gateway with the deterministic judge stand-in (`BOUNCER_JUDGE=fake`) and prints that it did. To run the real models (Apple Silicon): `make models` once, then `make judge` in a second terminal before `make dev`. Details: [docs/RUNNING.md](docs/RUNNING.md).
 
-## Three ways to connect
+## Four ways to connect
 
 1. **OpenAI-compatible proxy** (`/v1/chat/completions`, plain and streaming, `/v1/models`): change `base_url`, use the agent's Bouncer key. Bouncer sees prompts, tool definitions, tool calls and tool results. In a stream the response headers (`X-Bouncer-Action`, ...) carry the input decision only, because they are sent before the model output is checked; the final chunk carries the final decision in an extra `bouncer` field, and a block during the stream ends it with an `error` event.
 2. **MCP gateway** (`/mcp`, streamable HTTP): point an MCP client at Bouncer instead of the tool server. Tool definitions are pinned by hash (a changed definition is blocked until a human re-approves it), poisoned descriptions are hidden, every call and result is checked: text and embedded text resources are scanned, image, audio and binary blocks are withheld. Pins live in memory and are rebuilt after a restart.
-3. **Control API** for anything else, including agent-to-agent messages:
+3. **A2A gateway** (`POST /a2a/<agent_id>`, JSON-RPC `message/send` of the Agent2Agent protocol): one agent calls another through Bouncer with its own key. Only agents listed in `a2a.agents` can be called, and only by their `allowed_callers` (403 `auth.a2a_not_allowed`). The caller's text and data parts are checked like a user message (secrets and PII redacted before the other agent sees them, injection, signatures, harmful requests, T1/T2); the other agent's reply is checked like an untrusted tool result plus the output checks (markdown image exfiltration, HTML), then redacted or withheld. File parts and metadata are not forwarded. `GET /a2a/<agent_id>/.well-known/agent.json` returns the agent card, scanned like a tool definition. Blocks are JSON-RPC errors with code -32001. `make a2a-demo` shows four messages to a demo Risk Analyst agent (allowed, key redacted on the way out, exfiltration image and key redacted in the reply, injected reply withheld) and one caller that is not allowed. Messages are not signed end to end; streaming (`message/stream`) is not proxied.
+4. **Control API** for anything else:
 
 ```bash
 curl -s localhost:8700/v1/guard/check -H "Authorization: Bearer $BOUNCER_KEY_OPS_COPILOT" \
@@ -81,7 +82,7 @@ So an injection does not have to be recognized to be stopped: the action it trie
 | `approvals`: human approval of one exact call | LLM06 | ASI09 | |
 | `harmful_content`: requests for help with money laundering, sanctions or KYC evasion, fraud and phishing against customers, malware, violence, self-harm (EN/PL/DE); questions about detecting, preventing or reporting abuse pass. MITRE ATLAS AML.T0048 (External Harms) | | | block at T0 when the aim is explicit, otherwise T2 judge |
 
-Not covered, on purpose: misinformation (LLM09). Only partly covered: training data poisoning (LLM04, only model sources and unsafe deserialization), vector store access control (LLM08, retrieved text is scanned, the store is not governed), agent-to-agent communication (ASI07, delegation is checked against the policy, but messages between agents are not signed end to end). The dashboard Coverage view lists every risk marked partial with the reason. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+Not covered, on purpose: misinformation (LLM09). Only partly covered: training data poisoning (LLM04, only model sources and unsafe deserialization), vector store access control (LLM08, retrieved text is scanned, the store is not governed), agent-to-agent communication (ASI07: messages through the A2A route are checked both ways and delegation is checked against the policy, but messages between agents are not signed end to end, only `message/send` is proxied, and agents that talk to each other directly are not seen). The dashboard Coverage view lists every risk marked partial with the reason. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 ## Policy as code
 
@@ -125,6 +126,8 @@ Test cases are YAML files in [`tests/cases/`](tests/cases/), grouped by control.
     upstream_must_not_contain: ["AKIAIOSFODNN7EXAMPLE"]   # the simulated model records what it received
 ```
 
+A case with `a2a: {agent, text | parts, method, card}` instead of `request` sends an A2A message to the demo Risk Analyst agent (see [`tests/cases/a2a.yaml`](tests/cases/a2a.yaml)); `upstream_*` then refers to what that agent received.
+
 The YAML cases (not the unit tests) also run from the dashboard (self-test button in Playground).
 
 ## Reporting
@@ -156,7 +159,7 @@ On the bank-operations set alone the pipeline catches 120 of 134 attacks (90%) w
 
 **Overhead** (`make bench`, simulated model, 200 requests per scenario; [reports/bench.md](reports/bench.md)): gateway overhead p50 10.8 ms for a short prompt and 83 ms for a 2 KB prompt, of which T1 is 88 to 95%; 0.2 ms for a repeated prompt (cached). Throughput of one worker: about 187 req/s with T1 at 8 to 32 concurrent clients (p95 98 ms at 32 clients), about 620 req/s without it. MCP gateway: 7.7 ms overhead p50 per tool call (measured once during development against the live stack; not part of `make bench`).
 
-**Tests**: `make test` runs 1169 tests (461 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
+**Tests**: `make test` runs 1200 tests (475 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
 
 ## Architecture
 
@@ -185,6 +188,7 @@ docs/           architecture, threat model, API, running guide
 | 8702 | simulated commercial model API (illustrative prices, no paid API is called) |
 | 8703 | demo MCP server |
 | 8704 | signature feed server (remote feed demo) |
+| 8707 | demo A2A agent "Risk Analyst" (`make a2a-agent`, only for `make a2a-demo GATEWAY=...`) |
 
 Ollama (11434) is used for local models when present.
 

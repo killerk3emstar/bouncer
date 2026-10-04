@@ -36,6 +36,8 @@ def unsupported(case: dict[str, Any], live: LiveStack) -> str | None:
     for key in TEST_ONLY_KEYS:
         if key in case or any(key in s for s in steps):
             return f"uses {key} (a test-only hook of the offline runner; the live stack runs its real policy and models)"
+    if any("a2a" in s for s in steps):
+        return "A2A case: runs in the offline runner, which mounts the demo A2A agent in-process (live: make a2a-demo GATEWAY=...)"
     for i, step in enumerate(steps):
         principal = step.get("principal", case.get("principal", "playground"))
         if principal is not None and step.get("auth", True) and not step.get("api_key") and principal not in live.keys:

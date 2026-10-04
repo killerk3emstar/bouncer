@@ -1,6 +1,6 @@
 # Bouncer architecture
 
-Bouncer is a gateway that sits between AI agents and everything they call: models (OpenAI-compatible API), MCP tool servers, and other services that ask it for a decision (`POST /v1/guard/check`). Every call passes one decision pipeline driven by one policy file.
+Bouncer is a gateway that sits between AI agents and everything they call: models (OpenAI-compatible API), MCP tool servers, other agents (A2A, `POST /a2a/<agent_id>`), and other services that ask it for a decision (`POST /v1/guard/check`). Every call passes one decision pipeline driven by one policy file.
 
 ## Components
 
@@ -10,6 +10,7 @@ flowchart LR
     A1[Agent using the OpenAI SDK]
     A2[MCP client]
     A3[Any service / other agent]
+    A4[A2A client agent]
   end
   subgraph GW["Bouncer gateway :8700 (FastAPI, stateless per request)"]
     AUTH[1 auth: API key to principal, model and tool allowlists]
@@ -30,16 +31,19 @@ flowchart LR
   U1[Ollama :11434, local models]
   U2[simulated commercial API :8702]
   M[demo MCP server :8703]
+  RA[demo A2A agent :8707]
   D[dashboard /ui and /api, /metrics]
 
   A1 -->|/v1/chat/completions| AUTH
   A2 -->|/mcp| AUTH
   A3 -->|/v1/guard/check| AUTH
+  A4 -->|/a2a/agent_id| AUTH
   AUTH --> BUD --> NORM --> T0 --> T1 --> T2C --> DEC --> FWD --> ACC
   T2C -->|escalations only, redacted| J
   FWD --> U1
   FWD --> U2
   FWD --> M
+  FWD --> RA
   POL -.-> DEC
   FEED -.-> T0
   STORE -.-> BUD
@@ -59,6 +63,17 @@ flowchart LR
 8. **Decision.** The strongest action wins: allow < log < redact < require_approval < block. `mode: monitor` (global or per control) records what would have happened and enforces nothing. The `permissive` profile records non-critical findings as log; `strict` tightens thresholds and requires approval for every side effect.
 9. **Forward and check the response.** Redactions are applied before the upstream sees the request (a secret inside a tool definition cannot be rewritten in place, so it blocks the request); a canary token is added to the system prompt. The model's text is scanned (secrets, PII, markdown image/link exfiltration, HTML, canary leak), including `reasoning`, `reasoning_content` and `refusal` fields in plain responses; in streams the reasoning fields are dropped because they cannot be checked incrementally. A legacy `function_call` answer gets the same checks as a tool call (in a stream it is blocked). The model's tool calls are checked before the agent receives them: tool allowlist, argument rules (recipient domains, forbidden fields such as BCC, amount limits), signatures and secrets in arguments, PII set to `block` in arguments (a full card number; arguments are never rewritten), lethal trifecta (session read untrusted content and sensitive data and now sends data out), identical-call loops, and the T2 goal-alignment check; the content of a memory write (`tool_governance.memory_write_tools`) also gets the injection checks. Streaming responses are released only up to a safe boundary (at least 64 characters behind the newest text, never inside a word, an unclosed markdown link or image, an HTML tag or a PEM block), so redaction works across chunk boundaries; tool calls are buffered until their arguments are complete. The response headers of a stream are sent before the output is checked, so they carry the input decision; the final chunk carries the final decision in an extra `bouncer` field (`action`, `trace_id`, `findings`), and a block during the stream ends it with an `error` event.
 10. **Account and audit.** Cost from token usage and the policy's prices (local models: GPU seconds times an internal rate), one audit event per decision with the full trace, Prometheus metrics.
+
+## Agent-to-agent flow (A2A)
+
+`POST /a2a/<agent_id>` (JSON-RPC `message/send`, `bouncer/gateway/a2a_gateway.py`) uses the same pipeline:
+
+1. The caller authenticates with its own key; `X-Bouncer-On-Behalf-Of` applies as above. The target must be in `a2a.agents` and the caller in its `allowed_callers` (403 `auth.a2a_not_allowed`).
+2. Each text part, and each data part serialized as JSON, becomes a user message from another agent and goes through steps 2 to 8 (budgets and step limit, normalization, T0, T1, T2). The redacted text is written back into the parts. File parts and metadata are not checked and not forwarded. The request event (direction `input`) is written before the target is called; the caller's key is never forwarded (the target gets `X-Bouncer-Caller`).
+3. The reply's text and data parts are scanned as an untrusted tool result (secrets, PII, injection aimed at the caller, signatures, T1/T2) and with the output checks (markdown image/link exfiltration, HTML). Redacted in place or withheld as a whole; the reply event (direction `output`) links to the request event. A delivered reply marks the session as having read untrusted content, so a later outbound tool call in the same session meets the lethal trifecta check.
+4. The agent card (`GET /a2a/<agent_id>/.well-known/agent.json`) is scanned like a tool definition and its `url` is rewritten to the Bouncer route.
+
+Messages are not signed end to end, and agents that talk to each other directly are not seen.
 
 ## Human approval
 

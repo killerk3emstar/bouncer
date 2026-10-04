@@ -39,7 +39,7 @@ Shapes that differ from the examples below (the dashboard handles them):
 
 - Audit event: `tool` is the tool name as a string; the masked arguments are in `tool_calls[]`
   (`{tool, wire_name, call_hash, arguments, findings}`). Extra keys: `t1` (T1 scores per segment),
-  `downgraded_from`, `notes`, and `mcp` on MCP events. Findings also carry `id`, `effective_action`, `monitor`,
+  `downgraded_from`, `notes`, `mcp` on MCP events and `a2a` on A2A events (section 9). Findings also carry `id`, `effective_action`, `monitor`,
   `message`, `direction`, `source` and `view`. `judge` is `{"invoked": false}` when T2 did not run; `usage` is `{}`
   when nothing was billed; `upstream` is `null` for MCP events (the server is in `mcp.server`). Delegated requests
   have `principal.via`.
@@ -66,7 +66,8 @@ Shapes that differ from the examples below (the dashboard handles them):
 - Endpoints not in the table of section 4: `PUT /api/policy` and `POST /api/policy/validate` (policy editing in
   the dashboard), `GET /api/approvals/{id}`, `GET /api/mcp/tools`, `POST /admin/policy/reload`, `GET /healthz`, and
   for agents (agent key, not the admin token) `GET /v1/approvals/{id}`, which returns the status of the agent's own
-  approval request.
+  approval request, and the agent-to-agent route `POST /a2a/{agent_id}` with `GET /a2a/{agent_id}/.well-known/agent.json`
+  (section 9).
 
 ---
 
@@ -878,7 +879,7 @@ OCSF: one OCSF 1.3.0 Detection Finding per line (`class_uid` 2004, `category_uid
 - `covered`: mapping is `full`, control enabled, `enforce`, tests pass.
 - `tests`: number of YAML cases tagged with both the control and the risk id (`owasp_llm` / `owasp_agentic` in the case).
 
-**Risk status**: `covered` if at least one cell is `covered` and the mapping does not mark the risk as only partially addressable; `partial` if the best cell is `partial` (or the risk note says only part of it is addressed); `none` if there are no cells or all cells are `none`. The fixture marks LLM04, LLM08, ASI03, ASI06, ASI08, ASI09, ASI10 as partial and LLM09, ASI07 as not covered. The backend (`COVERAGE_MAP` in `bouncer/gateway/admin_api.py`) now marks LLM04, LLM08, ASI03, ASI07, ASI08, ASI09, ASI10 as partial and LLM09 as not covered (ASI06 is covered by the memory-write checks, ASI07 is partial through agent delegation); with the shipped policy the live posture score is 78 (12 covered, 7 partial, 1 not covered).
+**Risk status**: `covered` if at least one cell is `covered` and the mapping does not mark the risk as only partially addressable; `partial` if the best cell is `partial` (or the risk note says only part of it is addressed); `none` if there are no cells or all cells are `none`. The fixture marks LLM04, LLM08, ASI03, ASI06, ASI08, ASI09, ASI10 as partial and LLM09, ASI07 as not covered. The backend (`COVERAGE_MAP` in `bouncer/gateway/admin_api.py`) now marks LLM04, LLM08, ASI03, ASI07, ASI08, ASI09, ASI10 as partial and LLM09 as not covered (ASI06 is covered by the memory-write checks, ASI07 is partial: the A2A route checks messages both ways and delegation is checked, but messages are not signed end to end); with the shipped policy the live posture score is 78 (12 covered, 7 partial, 1 not covered).
 
 **Posture score** = `round(100 * (covered + 0.5 * partial) / 20)`. Disabling a control or switching it to monitor lowers the score on the next request, which is what the jury will try.
 
@@ -939,3 +940,51 @@ Fixture sets: `?fixtures=empty` (no traffic, no approvals, no signatures), `?fix
 - The block messages in fixtures follow the rule "which rule fired, why, what to do next" and end with the trace id; please keep that style in the real `message` and `block.message`.
 - Fixture scenario 3 assumes that an injection found in a **tool result** is only recorded (`log`) and that the following `mail.send` to an external domain is held for approval. The shipped policy does not work that way: injection heuristics block a tool result (`prompt_injection.heuristics.action: block`), the judge blocks at P(yes) >= 0.50, and `mail.send` to a domain outside `bank.example` is `block`. The real scenario `s3-indirect-injection-trifecta` therefore ends with `block` at the tool result; the approval flow (lethal trifecta, `require_approval`) is shown by `s3e-trifecta-approval` with a transfer.
 - `GET /api/controls` must list controls that are missing from the policy as disabled; that is how a deleted section becomes visible to the jury.
+
+## 9. Agent-to-agent route (A2A)
+
+Not part of the admin API: agents call it with their own Bouncer key (`Authorization: Bearer <agent key>`), like
+`/v1/chat/completions`. `X-Bouncer-On-Behalf-Of` and `X-Bouncer-Session` work as on the other routes; without a
+session header the session is the message's `contextId`, or `a2a_<agent_id>`.
+
+`POST /a2a/{agent_id}`: JSON-RPC 2.0, method `message/send` (alias `tasks/send`), A2A message shape:
+
+```json
+{"jsonrpc": "2.0", "id": 1, "method": "message/send",
+ "params": {"message": {"role": "user", "messageId": "m1", "contextId": "c1",
+   "parts": [{"kind": "text", "text": "Summarize today's risk."}, {"kind": "data", "data": {"portfolio": "treasury"}}]}}}
+```
+
+- The agent must be listed in `a2a.agents` and the caller in `a2a.agents.<id>.allowed_callers` (with delegation,
+  the caller and the agent it acts for). Otherwise 403 with finding `auth.a2a_not_allowed`.
+- Text parts and data parts (serialized as JSON) are checked as user messages from another agent; the redacted
+  text is what the target receives (a redacted data part stays JSON). `file` parts and `metadata` are not checked
+  and are not forwarded (a file part becomes a text part saying it was withheld). Text longer than
+  `a2a.max_message_chars` is refused (`budgets.a2a_message_chars`).
+- The target's reply (a Message, or a Task with `status.message`, `artifacts` and `history`; a JSON-RPC error's
+  `message`) is checked like an untrusted tool result plus the output checks (markdown image/link exfiltration,
+  HTML). Redactions are applied in place; a block withholds the whole reply. The reply's own `metadata` and
+  error `data` are dropped; `result.metadata.bouncer` (or `error.data.bouncer`) carries `action`, `trace_id`,
+  `request_trace_id`, `policy_version` and the finding ids. A delivered reply marks the caller's session as having
+  read untrusted content (`a2a.<agent_id>`), which feeds the lethal trifecta check, and counts as one step for
+  `budgets.sessions.max_steps`.
+- Errors are JSON-RPC error objects: `-32001` blocked by policy (HTTP 401 for a missing key, 403 otherwise, 429 for
+  rate limits), `error.message` is `[Bouncer] <message> (rule <id>, trace <trace_id>)` and `error.data.bouncer`
+  holds `action`, `code`, `message`, `trace_id`, `approval_id`, `policy_version`; `-32002` the target agent could
+  not be reached or did not answer with JSON-RPC (HTTP 502); `-32600`, `-32601` (any other method, including
+  `message/stream`), `-32602`, `-32700` for invalid requests (HTTP 400).
+- Headers: `X-Bouncer-Action` (the stronger of both directions), `X-Bouncer-Trace-Id` (the reply event, or the
+  request event when the message was stopped) and `X-Bouncer-Request-Trace-Id` (the request event) when the
+  message was forwarded.
+- Audit: two events per forwarded message, both `route: "a2a.send"`: `direction: "input"` for the caller's
+  message (written before the target is called; `a2a.reply_trace_id` links to the reply) and `direction: "output"`
+  for the reply (`a2a.request_trace_id`). A message stopped by Bouncer writes only the input event. Extra key
+  `a2a`: `{agent, method, ...}`.
+
+`GET /a2a/{agent_id}/.well-known/agent.json` (also `agent-card.json`): the target's agent card (from
+`a2a.agents.<id>.card_url`, default `<origin of url>/.well-known/agent.json`). All its strings are scanned like a
+tool definition (anything that would be redacted withholds the card) and `url` is rewritten to the Bouncer route.
+Audit route `a2a.card`, direction `tool_definition`. Errors use the Bouncer error shape of `/v1/chat/completions`.
+
+Not built: `message/stream`, task management (`tasks/get`, `tasks/cancel`), push notifications, signatures on
+messages between agents.
