@@ -344,8 +344,11 @@ class FeedStore:
         raw_sha = hashlib.sha256(body).hexdigest()
         with self._lock:
             self.last_check = time.time()
-            if self.active is not None and self.active.raw_sha256 == raw_sha and self.last_error is None:
-                return False  # unchanged
+            if self.active is not None and self.active.raw_sha256 == raw_sha:
+                # unchanged, or the active file restored after a rejected update: nothing new to load
+                self.last_error = None
+                self.last_error_at = None
+                return False
 
         verified = self._verify(body, sig_bytes)
 

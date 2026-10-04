@@ -361,6 +361,10 @@ def test_feed_changes_are_reported_for_the_audit_log(tmp_path: Path, record_prop
     store._last_mtime = 0.0  # the same bad file checked again: no second event
     store.maybe_refresh()
 
+    doc["version"] = 2
+    write(doc)  # the active version restored: the error clears, no new event
+    store.maybe_refresh()
+    assert store.last_error is None
     assert [k for k, _ in events] == ["feed.updated", "feed.rejected"]
     assert events[0][1]["feed"]["from_version"] == 1 and events[0][1]["feed"]["to_version"] == 2
     assert "previous feed stays active (version 2)" in events[1][1]["message"]
