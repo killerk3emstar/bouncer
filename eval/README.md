@@ -15,7 +15,7 @@ Outputs (prefix `eval` by default, set with `--out`):
   false positives and missed attacks on `bank_ops`.
 - `reports/eval.json`: the same numbers, machine-readable (for slides and the dashboard).
 - `reports/eval_predictions.jsonl`: one line per text and layer (id, label, flagged, score,
-  latency), for error analysis.
+  latency), for error analysis. Regenerated on every run and not committed (`.gitignore`).
 
 Metrics: precision, recall, F1, false-positive rate (FPR), ROC AUC from the layer score, and
 latency p50/p95 per text. Positive class = injection. Latency is measured per text, one text per

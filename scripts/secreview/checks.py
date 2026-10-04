@@ -129,7 +129,8 @@ async def legacy_function_call() -> None:
     s2.mock.script([{"tool_calls": [{"name": "mail__send", "arguments": {"to": "someone@outside.example", "body": "report"}}]}])
     r2 = await s2.chat({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hi"}]})
     print("same call as tool_calls -> status", r2.status_code, r2.headers.get("x-bouncer-action"))
-    s.cleanup(); s2.cleanup()
+    s.cleanup()
+    s2.cleanup()
 
 
 @check
@@ -236,7 +237,7 @@ async def stream_unclosed_link() -> None:
     text = "Report ready. " + "![chart](https://img.example.net/c.png?d=" + "Q" * 40 + " and the rest of the answer follows here without closing the image."
     s.mock.script([{"content": text, "chunk_size": 5}])
     r = await s.chat({"model": "gpt-4o-mini", "stream": True, "messages": [{"role": "user", "content": "go"}]})
-    got = "".join(json.loads(l[5:])["choices"][0]["delta"].get("content", "") for l in r.text.splitlines() if l.startswith("data: {") and "choices" in l and json.loads(l[5:]).get("choices"))
+    got = "".join(json.loads(line[5:])["choices"][0]["delta"].get("content", "") for line in r.text.splitlines() if line.startswith("data: {") and "choices" in line and json.loads(line[5:]).get("choices"))
     print("streamed text equals upstream text:", got == text)
     s.cleanup()
 

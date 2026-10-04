@@ -13,11 +13,11 @@ import shutil
 import tempfile
 from pathlib import Path
 
+import harness  # noqa: F401  (chdir + env)
 from fastmcp import Client, FastMCP
 from fastmcp.client.transports import StreamableHttpTransport
 from mcp.types import EmbeddedResource, TextResourceContents
 
-import harness  # noqa: F401  (chdir + env)
 from bouncer.gateway.app import create_app
 from bouncer.gateway.state import Settings
 from tests.unit.mcp.test_mcp_gateway import _Server
