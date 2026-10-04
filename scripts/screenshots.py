@@ -73,6 +73,9 @@ async def main() -> None:
             path = OUT / f"dashboard_{name}.png"
             await page.screenshot(path=str(path), full_page=name not in ("events",) and not name.startswith("trace_"))
             print("wrote", path.relative_to(OUT.parent.parent))
+            if name == "overview":  # the top of the page (header, KPIs, posture, traffic) for the README
+                await page.screenshot(path=str(OUT / "readme_overview.png"), clip={"x": 0, "y": 0, "width": 1440, "height": 578})
+                print("wrote presentation/assets/readme_overview.png")
         if token:
             await ctx.set_extra_http_headers({"Authorization": f"Bearer {token}"})
         await page.goto(f"{args.base}/reports/summary")
