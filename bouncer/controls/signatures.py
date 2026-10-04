@@ -361,7 +361,12 @@ class FeedStore:
 
         with self._lock:
             current = self.active
-        if current is not None and model.feed == current.model.feed and model.version < current.model.version:
+        if current is not None and model.feed != current.model.feed:
+            # a feed signed with the same key but under another name must not replace the active one
+            raise FeedVerifyError(
+                f"feed name {model.feed!r} does not match the active feed {current.model.feed!r} (replacement refused)"
+            )
+        if current is not None and model.version < current.model.version:
             # an older feed, even with a valid signature, would silently remove newer signatures
             raise FeedVerifyError(
                 f"feed version {model.version} is older than the active version {current.model.version} (rollback refused)"

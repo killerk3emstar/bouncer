@@ -7,7 +7,7 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 - `make test`: 1216 tests in about 12 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
   - 475 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, harmful requests, agent-to-agent (A2A), red team, benign hard negatives).
   - The rest are unit tests (gateway mechanics, policy reload, audit chain and exports incl. OCSF, controls, judge, T1, signatures, MCP gateway, A2A gateway, shared Redis store with two simulated replicas, MITRE ATLAS id check, demo).
-- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 365 passed, 84 skipped (cases that need scripted judge answers or policy patches), 0 failed, about 100 s.
+- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 380 passed, 101 skipped (cases that need scripted judge answers or policy patches), 0 failed, 126 s.
 - `make demo`: 12 of 12 scripted attack scenarios pass, including an MCP rug pull.
 - Docker: `docker compose run --rm tests` passes the same suite in a Linux container (one Apple-only test skipped).
 
@@ -75,7 +75,7 @@ All found by tests, the red team or a dedicated security review during the night
 
 ## Added on 2026-10-04 morning (slide: robustness, reporting, scalability)
 
-- Harmful requests (`make harm-probe`, 33 EN/PL/DE texts through the running stack with Clef) [reports/harmful_content.md]: 14 of 14 harmful requests stopped (10 blocked at T0 in about 1 ms, 4 by the judge, median 2.3 s on the loaded machine), 0 of 19 defensive or ordinary requests stopped.
+- Harmful requests (`make harm-probe`, 33 EN/PL/DE texts through the running stack with Clef) [reports/harmful_content.md]: 14 of 14 harmful requests stopped (10 blocked at T0 in about 1 ms, 4 by the judge, median 1.0 s per uncached judge decision), 0 of 19 defensive or ordinary requests stopped.
 - Agent-to-agent (A2A JSON-RPC `message/send`) through `/a2a/<agent>`: secret in the outgoing message redacted, markdown image and key in the reply redacted, injected reply withheld, unlisted caller refused with 403 (live, `make a2a-demo`).
 - Several replicas: with `BOUNCER_STORE=redis://...` two gateways share spend, sessions and approvals; an approval granted through one replica was used exactly once through the other (live check with Redis in docker).
 - Audit export in OCSF 1.3.0 (Detection Finding): validated with the OCSF schema server, 0 errors for every decision type.

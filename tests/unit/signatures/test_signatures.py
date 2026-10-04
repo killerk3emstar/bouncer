@@ -322,6 +322,12 @@ def test_rollback_to_older_signed_feed_is_refused(tmp_path: Path, record_propert
     store.maybe_refresh()
     assert store.active.version == 5 and len(store.active.compiled) == len(doc["signatures"])
     assert "rollback" in (store.last_error or "")
+    renamed = dict(doc, feed="another-feed", version=1, signatures=doc["signatures"][:3])  # same key, other name
+    write_signed(renamed)
+    os.utime(feed, (_t.time() + 10, _t.time() + 10))
+    store.maybe_refresh()
+    assert store.active.version == 5 and store.active.model.feed == doc["feed"]
+    assert "replacement refused" in (store.last_error or "")
 
 
 def test_feed_changes_are_reported_for_the_audit_log(tmp_path: Path, record_property):  # noqa: ANN001
