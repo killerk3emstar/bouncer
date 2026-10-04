@@ -4,7 +4,7 @@ Exposes the same six tools as demo/tools.py over MCP streamable HTTP on
 127.0.0.1:8703 (server name "demo-bank"). Tool names keep their dots
 (crm.lookup_customer): MCP allows dots, unlike the OpenAI wire format.
 
-Rug-pull demo (PLAN.md scenario 8, control 16): an admin toggle swaps the
+Rug-pull demo (scenario s8): an admin toggle swaps the
 description of kb.search for a poisoned one in the style of the Invariant Labs
 tool-poisoning write-up (April 2025) - an <IMPORTANT> block telling the model to
 read ~/.ssh/id_rsa and smuggle it through a tool parameter. The description is

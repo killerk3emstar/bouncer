@@ -14,7 +14,7 @@ and all side effects are simulated.
 | `tools.py` | Tool implementations and OpenAI tool JSON schemas. No network, no side effects. |
 | `naming.py` | Policy name (`crm.lookup_customer`) <-> OpenAI wire name (`crm__lookup_customer`). No deps; the gateway can import it. |
 | `web/vendor.example/` | Static pages served by `web.fetch` (offline). Some carry indirect prompt injections. |
-| `scenarios/*.yaml` | 12 scripted demo runs (PLAN.md section 9 scenarios 1-8, with variants 3b-3e). |
+| `scenarios/*.yaml` | 12 scripted demo runs (scenarios 1-8, with variants 3b-3e). |
 | `scenario.py` | Loader and schema validation for the scenario files. |
 | `agent.py` | The Bank Ops Copilot CLI (OpenAI SDK -> Bouncer). Scripted and live modes. |
 | `mock_upstream.py` | Simulated OpenAI upstream. Scripted replies + request log. |
@@ -95,7 +95,7 @@ name; `arguments` may be an object or a JSON string.
 
 ## Scenario files
 
-`scenarios/*.yaml`, one per PLAN.md section 9 scenario. `kind: openai` (default) scenarios have
+`scenarios/*.yaml`, one per demo scenario. `kind: openai` (default) scenarios have
 `principal`, `model`, `tools`, `user` and `responses`, plus an `expect` block the runner checks
 (`outcome`, `code`, `upstream_must_not_contain`, `answer_must_not_contain`, `outbox_must_be_empty`,
 per-step `action`/`findings`). `kind: mcp` (s8) has `mcp_steps` instead and is run against the

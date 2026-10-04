@@ -67,8 +67,8 @@ reports 10 to 11 s) on the machine above; on two fresh clones the first run took
 - `reports/tests/junit.xml`: JUnit XML for CI,
 - `reports/tests/report.html`: self-contained HTML report.
 
-To add a case without writing Python, append an entry to a file in `tests/cases/` (format: the existing
-entries and `docs/PLAN.md` section 8) and rerun `make test`.
+To add a case without writing Python, append an entry to a file in `tests/cases/` (format: copy an existing
+entry; every key is used by at least one case) and rerun `make test`.
 
 ### make test-live
 

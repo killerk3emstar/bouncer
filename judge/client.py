@@ -56,7 +56,7 @@ class JudgeResult:
         return (self.answers.get(question) or {}).get(option)
 
     def to_audit(self) -> dict[str, Any]:
-        """The ``judge`` object of an audit event (PLAN.md section 3)."""
+        """The ``judge`` object of an audit event (docs/API.md section 3)."""
         out = {k: v for k, v in asdict(self).items() if k in
                ("invoked", "reason", "backend", "answers", "latency_ms", "cached", "error", "model")}
         if out["error"] is None:

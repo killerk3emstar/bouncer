@@ -105,7 +105,7 @@ The dashboard then asks for the token once, stores it in `localStorage` (`bounce
 
 ### Errors
 
-Any non-2xx response uses the same body as the proxy errors in PLAN.md section 3:
+Any non-2xx response uses the same body as the proxy errors:
 
 ```json
 {"error": {"type": "not_found", "code": "approvals.unknown_id", "message": "Approval apr_ffff not found."}}
@@ -127,7 +127,7 @@ The dashboard shows `error.message` next to the HTTP status. Use 400/422 for bad
 
 ## 3. Audit event
 
-`/api/events`, `/api/events/{trace_id}`, the SSE stream, `POST /api/playground` and `POST /api/scenarios/{id}/run` all return audit events **exactly as written to `data/audit.jsonl`** (one JSON object per line). The shape is the PLAN.md section 3 contract plus these additions (all required keys, use `null` when not applicable):
+`/api/events`, `/api/events/{trace_id}`, the SSE stream, `POST /api/playground` and `POST /api/scenarios/{id}/run` all return audit events **exactly as written to `data/audit.jsonl`** (one JSON object per line). The shape is the base audit event plus these additions (all required keys, use `null` when not applicable):
 
 | Field | Added? | Meaning |
 |---|---|---|
@@ -671,7 +671,7 @@ Query: `window` as in 4.1. `layers` in this order: `t0`, `t1`, `t2`, `upstream`,
 }
 ```
 
-Fields are the feed format from PLAN.md section 4 with `match` reduced to `match_type` (never send the regex itself; it is not needed in the UI) plus the hit counters. `source` may be a local path or an `https://` URL (only URLs are rendered as links). CVE ids link to `https://nvd.nist.gov/vuln/detail/<id>`.
+Fields are the feed format from `signatures/README.md` with `match` reduced to `match_type` (never send the regex itself; it is not needed in the UI) plus the hit counters. `source` may be a local path or an `https://` URL (only URLs are rendered as links). CVE ids link to `https://nvd.nist.gov/vuln/detail/<id>`.
 
 ### 4.12 GET /api/approvals
 
@@ -794,7 +794,7 @@ Allowed request: `"action": "allow"`, `"status_code": 200`, `"reply": "<assistan
 }
 ```
 
-Fixture ids (PLAN.md section 9): `s1-customer-lookup`, `s2-env-secret-paste`, `s3-indirect-injection`, `s4-tool-loop`, `s5-budget-exhausted`, `s6-pickle-payload`, `s7-policy-threshold`, `s8-mcp-rug-pull`. `mode` is `scripted` or `live` (upstream used by the demo agent).
+Fixture ids: `s1-customer-lookup`, `s2-env-secret-paste`, `s3-indirect-injection`, `s4-tool-loop`, `s5-budget-exhausted`, `s6-pickle-payload`, `s7-policy-threshold`, `s8-mcp-rug-pull`. `mode` is `scripted` or `live` (upstream used by the demo agent).
 
 ### 4.16 POST /api/scenarios/{id}/run
 

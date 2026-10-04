@@ -6,15 +6,15 @@ below was reproduced in-process with `httpx.ASGITransport` (and, for MCP, a temp
 the test card `4111111111111111`, and `*.example` domains. Harness and checks are under
 `scripts/secreview/` (run: `PYTHONPATH=.:scripts/secreview uv run python scripts/secreview/checks.py`).
 
-The code changed several times during the review (the coordinator was fixing issues in parallel).
+The code changed several times during the review (fixes landed while it ran).
 Findings are split into **open** (reproduced on the latest tree), **fixed during the review**
 (reproduced, then verified fixed, with the fixing commit/area), and **held up** (checked, no defect).
 
-Repo HEAD at the final pass: `879487c` plus uncommitted edits in the working tree.
+Code state at the final pass: 2026-10-04 01:50.
 
 ---
 
-## Status after fixes (2026-10-04 02:10, lead)
+## Status after fixes (2026-10-04 02:10)
 
 All findings in this report were fixed after the review, each with a regression test in `make test`, except the items marked open.
 

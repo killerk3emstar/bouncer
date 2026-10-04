@@ -9,8 +9,6 @@ data/
 reports/tmp/
 node_modules/
 .DS_Store
-.claude/settings.local.json
-.claude/worktrees/
 reports/tests/
 reports/selftest/
 .pytest_cache/
