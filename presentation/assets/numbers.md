@@ -4,7 +4,7 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 
 ## Tests (slide: proof)
 
-- `make test`: 1216 tests in about 10 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
+- `make test`: 1216 tests in about 12 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
   - 475 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, harmful requests, agent-to-agent (A2A), red team, benign hard negatives).
   - The rest are unit tests (gateway mechanics, policy reload, audit chain and exports incl. OCSF, controls, judge, T1, signatures, MCP gateway, A2A gateway, shared Redis store with two simulated replicas, MITRE ATLAS id check, demo).
 - `make test-live` against the running stack with the real T1 classifier and the Clef judge: 365 passed, 84 skipped (cases that need scripted judge answers or policy patches), 0 failed, about 100 s.
@@ -18,8 +18,8 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 | Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
 |---|---|---|---|---|
 | T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.6 / 1.1 ms |
-| T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 11.7 / 22.0 ms |
-| Full pipeline T0 + T1 + T2 | 98.5% | 66.5% | 1.0% | 16.4 / 818 ms |
+| T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 11.8 / 22.0 ms |
+| Full pipeline T0 + T1 + T2 | 98.5% | 66.5% | 1.0% | 15.6 / 1057 ms (p95 0.8 to 1.6 s over three runs on the shared machine) |
 
 - On the bank-operations set alone: 120 of 134 attacks stopped (90%), 2 false positives in 144 benign prompts (1.4%).
 - On `deepset/prompt-injections`: 9 of 60. Most items there are role-play or topic-change requests that our judge questions do not count as attacks on a bank assistant. We report it anyway.
@@ -44,8 +44,8 @@ Clef-flash (Cloudflare, Apache 2.0), MLX 4-bit, one forward pass answers several
 
 `make bench`, simulated model API, one gateway worker, 200 requests per scenario [reports/bench.md]:
 
-- Gateway overhead p50: 10.8 ms for a short prompt, 83 ms for a 2 KB prompt; 0.2 ms when the same prompt repeats (cached). T1 is 88 to 95% of it; T0 is 0.3 to 2.6 ms.
-- Throughput with T1: about 187 requests per second at 8 to 32 concurrent clients, p95 98 ms at 32 clients. Without T1: about 620 requests per second.
+- Gateway overhead p50: 10.5 ms for a short prompt, 83.8 ms for a 2 KB prompt; 0.2 ms when the same prompt repeats (cached). T1 is 86 to 95% of it; T0 is 0.3 to 3.5 ms.
+- Throughput with T1: 187 to 195 requests per second at 8 to 32 concurrent clients, p95 107 ms at 32 clients. Without T1: about 580 requests per second.
 - Allowing 3 concurrent T1 inferences instead of 1 doubled throughput (95 to 187 req/s) and cut p95 at 32 clients from 2.2 s to 98 ms.
 - MCP gateway: about 5 to 8 ms overhead per tool call without the judge (one-off measurements on the live stack, not in a report); about 1.9 s when the judge is called for a side-effect tool.
 
@@ -72,3 +72,11 @@ All found by tests, the red team or a dedicated security review during the night
 ## Screenshots
 
 `dashboard_*.png` and `report_summary.png` in this folder (1440 px wide, 2x). Regenerate with `uv run --with playwright python scripts/screenshots.py` against a running stack after `make demo`.
+
+## Added on 2026-10-04 morning (slide: robustness, reporting, scalability)
+
+- Harmful requests (`make harm-probe`, 33 EN/PL/DE texts through the running stack with Clef) [reports/harmful_content.md]: 14 of 14 harmful requests stopped (10 blocked at T0 in about 1 ms, 4 by the judge, median 2.3 s on the loaded machine), 0 of 19 defensive or ordinary requests stopped.
+- Agent-to-agent (A2A JSON-RPC `message/send`) through `/a2a/<agent>`: secret in the outgoing message redacted, markdown image and key in the reply redacted, injected reply withheld, unlisted caller refused with 403 (live, `make a2a-demo`).
+- Several replicas: with `BOUNCER_STORE=redis://...` two gateways share spend, sessions and approvals; an approval granted through one replica was used exactly once through the other (live check with Redis in docker).
+- Audit export in OCSF 1.3.0 (Detection Finding): validated with the OCSF schema server, 0 errors for every decision type.
+- Live tests: `make test-live` 380 passed, 101 skipped, 0 failed. Red team re-run: 82/82 stopped, 46/46 benign allowed.
