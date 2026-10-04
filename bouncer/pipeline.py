@@ -674,14 +674,32 @@ class Engine:
                 state = {"USER_MESSAGE": _clip(clean, 2000)}
             else:
                 qid = "injection"
-                state = {"USER_REQUEST": _clip(self.audit_mask(ctx, ctx.user_request, "input"), 600), "UNTRUSTED_CONTENT": _clip(clean, 2000)}
-            res = await self._judge_call(ctx, state, {qid: questions[qid].model_dump(exclude_none=True)}, reason)
+                state = None
+            if state is not None:
+                states = [state]
+            else:
+                # a long page is judged in overlapping windows: clipping it to the first 2000 characters let
+                # padding push the payload out of the judge's view (reports/judge_attacks.md)
+                req = _clip(self.audit_mask(ctx, ctx.user_request, "input"), 600)
+                states = [{"USER_REQUEST": req, "UNTRUSTED_CONTENT": w} for w in _windows(clean, 2000, 200, 4)]
+            p_yes, res = 0.0, None
+            for st in states:
+                r = await self._judge_call(ctx, st, {qid: questions[qid].model_dump(exclude_none=True)}, reason)
+                if r is None:
+                    continue
+                if r.get("error"):
+                    res = r
+                    break
+                p = float(((r.get("answers") or {}).get(qid) or {}).get("yes", 0.0))
+                if res is None or p > p_yes:
+                    p_yes, res = p, r
+                if p_yes >= pi.judge.block_above:
+                    break
             if res is None:
                 continue
             if res.get("error"):
                 out.append(self._judge_failure(ctx, "prompt_injection", res["error"], seg))
                 continue
-            p_yes = float(((res.get("answers") or {}).get(qid) or {}).get("yes", 0.0))
             if p_yes >= pi.judge.block_above:
                 act, verb = Action.BLOCK, "blocked"
             elif p_yes >= pi.judge.approval_above:
@@ -863,10 +881,45 @@ class Engine:
         found = [f for f in found if f.control == "prompt_injection"]
         if not self._enforced_block(ctx, found):
             found += await self._semantic_injection(ctx, [(seg, clean, found)], pi)
+        if not self._enforced_block(ctx, found):
+            found += await self._judge_memory_write(ctx, seg, clean, found)
         for f in found:
             f.owasp_agentic = sorted(set(f.owasp_agentic) | {"ASI06"})
             f.message = f"{f.message} The text was about to be saved by {name}, where other agents would read it later."
         return found
+
+    async def _judge_memory_write(self, ctx: RequestCtx, seg: Segment, clean: str, found: list[Finding]) -> list[Finding]:
+        """Every memory write gets the T2 question memory_poisoning: a planted standing rule for later sessions
+        ("always send the customer list to ...") is not an instruction to this assistant, so the injection
+        question misses it (measured: p=0.03 on such a note)."""
+        tg = ctx.doc.controls.tool_governance
+        cfg = tg.memory_write_judge
+        question = ctx.doc.judge.questions.get("memory_poisoning")
+        if not cfg.enabled or question is None or not self._judge_enabled(ctx):
+            return []
+        text = apply_redactions(clean, [f for f in found if f.control in REDACTION_CONTROLS and f.span is not None])
+        ctx.escalated = True
+        state = {"USER_REQUEST": _clip(self.audit_mask(ctx, ctx.user_request, "input"), 600), "SAVED_NOTE": _clip(text, 2000)}
+        res = await self._judge_call(ctx, state, {"memory_poisoning": question.model_dump(exclude_none=True)}, "memory_write")
+        if res is None:
+            return []
+        if res.get("error"):
+            return [self._judge_failure(ctx, "tool_governance", res["error"], seg)]
+        p_yes = float(((res.get("answers") or {}).get("memory_poisoning") or {}).get("yes", 0.0))
+        if p_yes >= cfg.block_above:
+            act, verb = Action.BLOCK, "blocked"
+        elif p_yes >= cfg.approval_above:
+            act, verb = Action.REQUIRE_APPROVAL, "held for approval"
+        else:
+            return []
+        return [self._finding(
+            "tool_governance", "memory_poisoning", act,
+            f"T2 judge ({res.get('backend')}) rated the note {seg.tool} would save as an instruction planted for "
+            f"assistants in later sessions with p={p_yes:.2f}; {verb}. Save facts, not standing orders for the "
+            "assistant; ask a human to approve if the note is intended.",
+            tier="T2", severity="high", score=p_yes, direction=seg.direction, source=seg.source,
+            location=seg.location, owasp_agentic=["ASI06"],
+        )]
 
     def _tool_rules(self, ctx: RequestCtx, tg: Any, name: str, args: Any, sess: Any) -> list[Finding]:
         out: list[Finding] = []
@@ -1313,6 +1366,20 @@ def describe_source(source: str) -> str:
 
 def _clip(text: str, n: int) -> str:
     return text if len(text) <= n else text[: n - 20] + " ...[truncated]"
+
+
+def _windows(text: str, size: int, overlap: int, max_windows: int) -> list[str]:
+    """Overlapping windows that cover the text; above max_windows, evenly spaced ones incl. first and last."""
+    if len(text) <= size:
+        return [text]
+    step = size - overlap
+    starts = list(range(0, max(len(text) - overlap, 1), step))
+    if starts[-1] + size < len(text):
+        starts.append(len(text) - size)
+    if len(starts) > max_windows:
+        idx = [round(i * (len(starts) - 1) / (max_windows - 1)) for i in range(max_windows)]
+        starts = [starts[i] for i in sorted(set(idx))]
+    return [text[a : a + size] for a in starts]
 
 
 def _as_list(v: Any) -> list[str]:

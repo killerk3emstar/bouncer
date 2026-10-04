@@ -105,6 +105,7 @@ FINDING_ATLAS: dict[str, list[str]] = {
     "tool_governance.forbidden_field": ["AML.T0086", "AML.T0053"],
     "tool_governance.lethal_trifecta": ["AML.T0086", "AML.T0053"],
     "tool_governance.exfiltration": ["AML.T0086", "AML.T0053"],
+    "tool_governance.memory_poisoning": ["AML.T0080.000"],  # AI Agent Context Poisoning: Memory
     "budgets": ["AML.T0034"],  # Cost Harvesting
     "budgets.tokens_per_minute": ["AML.T0034", "AML.T0029"],  # + Denial of AI Service
     "budgets.max_input_tokens": ["AML.T0034.001", "AML.T0029"],  # Resource-Intensive Queries

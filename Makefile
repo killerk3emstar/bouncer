@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 PY := $(UV) run python
 
-.PHONY: help setup models dev gateway mock mcp feed judge judge-fake test test-live eval eval-full harm-probe bench demo verify-audit sign-feed lint a2a-agent a2a-demo docker-build docker-up docker-down docker-test clean-data
+.PHONY: help setup models dev gateway mock mcp feed judge judge-fake test test-live eval eval-full eval-actions harm-probe bench demo verify-audit sign-feed lint a2a-agent a2a-demo docker-build docker-up docker-down docker-test clean-data
 
 help:
 	@echo "make setup         install dependencies (uv sync) and create .env from .env.example"
@@ -71,6 +71,10 @@ eval:
 
 eval-full:
 	$(PY) eval/run_eval.py --layers t1,eval.layers:t0,eval.layers:pipeline --datasets bank_ops,deepset_test --out eval_layers
+
+eval-actions:  # needs make judge + make dev; BOUNCER_ADMIN_TOKEN set
+	$(PY) eval/action_layer.py
+	$(PY) eval/judge_attacks.py
 
 harm-probe:
 	$(PY) scripts/harm_probe.py

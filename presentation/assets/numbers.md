@@ -4,10 +4,10 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 
 ## Tests (slide: proof)
 
-- `make test`: 1216 tests in about 12 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
-  - 475 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, harmful requests, agent-to-agent (A2A), red team, benign hard negatives).
+- `make test`: 1231 tests in about 12 s, no network, no models (15 to 20 s on the first run of a fresh clone) [run `make test`; reports/tests/summary.md].
+  - 490 YAML cases that run through the full gateway (auth, budgets, loops, tool governance and lethal trifecta, secrets, PII, obfuscation, prompt injection, output safety and canary, signatures, supply chain, memory poisoning, agent delegation, harmful requests, agent-to-agent (A2A), red team, benign hard negatives).
   - The rest are unit tests (gateway mechanics, policy reload, audit chain and exports incl. OCSF, controls, judge, T1, signatures, MCP gateway, A2A gateway, shared Redis store with two simulated replicas, MITRE ATLAS id check, demo).
-- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 380 passed, 101 skipped (cases that need scripted judge answers or policy patches), 0 failed, 126 s.
+- `make test-live` against the running stack with the real T1 classifier and the Clef judge: 386 passed, 110 skipped (cases that need scripted judge answers or policy patches), 0 failed, 107 s.
 - `make demo`: 12 of 12 scripted attack scenarios pass, including an MCP rug pull.
 - Docker: `docker compose run --rm tests` passes the same suite in a Linux container (one Apple-only test skipped).
 
@@ -19,11 +19,11 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 |---|---|---|---|---|
 | T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.6 / 1.1 ms |
 | T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 11.8 / 22.0 ms |
-| Full pipeline T0 + T1 + T2 | 98.5% | 66.5% | 1.0% | 15.6 / 1057 ms (p95 0.8 to 1.6 s over three runs on the shared machine) |
+| Full pipeline T0 + T1 + T2 | 98.5% | 66.0% | 1.0% | 16.4 / 846 ms (p95 0.8 to 1.6 s over four runs on the shared machine) |
 
-- On the bank-operations set alone: 120 of 134 attacks stopped (90%), 2 false positives in 144 benign prompts (1.4%).
+- On the bank-operations set alone: 119 of 134 attacks stopped (89%), 2 false positives in 144 benign prompts (1.4%).
 - On `deepset/prompt-injections`: 9 of 60. Most items there are role-play or topic-change requests that our judge questions do not count as attacks on a bank assistant. We report it anyway.
-- This run (2026-10-04 01:52) uses the refined judge question for user messages (sharing one's own configuration or keys is not an attack); measured separately on 246 user prompts that question gives 75.5% recall with 0 false positives at the block threshold.
+- The run at 2026-10-04 07:02 (after the judge-evasion fixes) gives the numbers above. It uses the refined judge question for user messages (sharing one's own configuration or keys is not an attack); measured separately on 246 user prompts that question gives 75.5% recall with 0 false positives at the block threshold.
 
 ## Red team (slide: robustness)
 
@@ -79,4 +79,4 @@ All found by tests, the red team or a dedicated security review during the night
 - Agent-to-agent (A2A JSON-RPC `message/send`) through `/a2a/<agent>`: secret in the outgoing message redacted, markdown image and key in the reply redacted, injected reply withheld, unlisted caller refused with 403 (live, `make a2a-demo`).
 - Several replicas: with `BOUNCER_STORE=redis://...` two gateways share spend, sessions and approvals; an approval granted through one replica was used exactly once through the other (live check with Redis in docker).
 - Audit export in OCSF 1.3.0 (Detection Finding): validated with the OCSF schema server, 0 errors for every decision type.
-- Live tests: `make test-live` 380 passed, 101 skipped, 0 failed. Red team re-run: 82/82 stopped, 46/46 benign allowed.
+- Live tests: `make test-live` 386 passed, 110 skipped, 0 failed. Red team re-run: 82/82 stopped, 46/46 benign allowed.

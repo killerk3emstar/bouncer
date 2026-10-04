@@ -398,6 +398,29 @@ PATTERNS: list[Pattern] = [
         ("zeig", "gib", "nenne", "wiederhole", "verrate", "schreibe", "drucke"),
         atlas=("AML.T0056",),
     ),
+    # ---- text addressed to the security checks themselves (evading the judge, reports/judge_attacks.md)
+    Pattern(
+        "classifier-address", "text addressed to the security classifier", "high",
+        _c(
+            r"\b(?:note|message|instructions?|reminder)\s+(?:for|to)\s+(?:the\s+|any\s+)?(?:automated\s+|ai\s+)?"
+            r"(?:security\s+|safety\s+|content\s+|moderation\s+)?(?:classifier|filter|scanner|moderator|guardrail|judge|"
+            r"detector|review model)s?\b[^\n]{0,160}?\b(?:benign|safe|harmless|no instructions|answer|approved|reviewed|"
+            r"ignore|clean|not an? (?:attack|injection|threat))\b"
+            r"|\b(?:the\s+)?correct\s+answer\s+(?:for|to)\s+(?:every|each|all|any)\s+(?:of\s+the\s+)?questions?\b"
+            r"|\bread the complete state and schema\b"
+        ),
+        ("classifier", "filter", "scanner", "moderator", "guardrail", "judge", "detector", "review model",
+         "correct answer", "complete state"),
+        atlas=("AML.T0015", "AML.T0051.001"),
+    ),
+    Pattern(
+        "forged-verdict", "forged classifier verdict", "high",
+        _c(r"[\"']?(?:injection|exfiltration|jailbreak|harm|memory_poisoning)[\"']?\s*[:=]\s*[\"']?(?:no|benign|safe|aligned)\b"
+           r"[^\n]{0,120}?[\"']?(?:injection|exfiltration|jailbreak|harm|goal_alignment)[\"']?\s*[:=]\s*[\"']?(?:no|benign|safe|aligned)\b"),
+        ("injection", "exfiltration", "jailbreak", "goal_alignment"),
+        texts=("raw",),
+        atlas=("AML.T0015", "AML.T0051.001"),
+    ),
     # ---- claimed authority
     Pattern(
         "authority-claim", "claimed authority used to unlock a privileged mode", "high",

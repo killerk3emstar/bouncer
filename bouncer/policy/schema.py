@@ -183,6 +183,12 @@ class TrifectaCfg(Strict):
     action: ActionName = "require_approval"
 
 
+class MemoryWriteJudgeCfg(Strict):
+    enabled: bool = True
+    block_above: float = Field(0.50, ge=0, le=1)  # P(memory_poisoning = yes)
+    approval_above: float = Field(0.10, ge=0, le=1)
+
+
 class GoalAlignmentCfg(Strict):
     enabled: bool = True
     apply_to: Literal["side_effect_tools", "all_tools"] = "side_effect_tools"
@@ -207,6 +213,7 @@ class ToolGovernanceCfg(ControlCfg):
     untrusted_source_tools: list[str] = []
     sensitive_source_tools: list[str] = []
     memory_write_tools: list[str] = []  # content these tools persist is scanned like untrusted input
+    memory_write_judge: MemoryWriteJudgeCfg = MemoryWriteJudgeCfg()  # T2 question memory_poisoning on every such write
     unknown_tool: ActionName = "block"
     lethal_trifecta: TrifectaCfg = TrifectaCfg()
     goal_alignment: GoalAlignmentCfg = GoalAlignmentCfg()

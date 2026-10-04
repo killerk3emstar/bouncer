@@ -326,6 +326,8 @@ class CaseRunner:
                 res.failures.append(f"{label}response does not contain {s!r}")
         if expect.get("approval") is True and not (event or {}).get("approval_id"):
             res.failures.append(f"{label}expected an approval request")
+        if expect.get("approval") is False and (event or {}).get("approval_id"):
+            res.failures.append(f"{label}expected no approval request, got {(event or {}).get('approval_id')}")
         if expect.get("downgraded_to") and (event or {}).get("model") != expect["downgraded_to"]:
             res.failures.append(f"{label}expected downgrade to {expect['downgraded_to']}, got model {(event or {}).get('model')}")
         if step.get("sleep_ms"):

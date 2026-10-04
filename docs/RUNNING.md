@@ -59,7 +59,7 @@ judge stand-in (`BOUNCER_JUDGE=fake`) and prints that it did. Start `make judge`
 
 `make test` runs `pytest -m "not live"`: every YAML case in `tests/cases/` goes through the real gateway
 app in-process, with the simulated upstream mounted as a transport, the deterministic fake T1 classifier
-and the scriptable fake judge, plus the unit tests. Measured: 1,216 tests in about 12 s wall time (pytest
+and the scriptable fake judge, plus the unit tests. Measured: 1,231 tests in about 12 s wall time (pytest
 reports 10 to 12 s) on the machine above; on two fresh clones the first run took 15 and 19 s wall time
 (13 and 16 s pytest) while Python compiled the modules. The test count grows as cases are added. Reports:
 
@@ -88,7 +88,7 @@ At the end the session prints per-layer latency (T0, T1, T2, upstream, gateway o
 score, the judge call and the findings for every request.
 
 Measured against the running stack with the real T1 and the Clef judge (`reports/tests/summary_live.md`,
-2026-10-04 04:37): 380 passed, 101 skipped, 0 failed in 126 s (the judge runs on many cases, so most of the time is T2). An earlier run of the five AI-layer checks alone
+2026-10-04 07:08): 386 passed, 110 skipped, 0 failed in 107 s (the judge runs on many cases, so most of the time is T2). An earlier run of the five AI-layer checks alone
 (session output, not saved in `reports/`) passed in 2.95 s: the English injection was escalated by T1 (score 1.0)
 and blocked by the judge (T2 1,147 ms); the Polish injection and the benign Polish prompt went to the judge as
 non-English text (675 ms and 661 ms) and were blocked and allowed respectively; the benign English prompt cost
