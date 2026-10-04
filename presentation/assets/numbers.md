@@ -17,13 +17,13 @@ Every number below was measured on an Apple M4 Pro (48 GB, macOS 27.0.1, Python 
 
 | Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
 |---|---|---|---|---|
-| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.4 / 0.8 ms |
-| T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 10.5 / 20.4 ms |
-| Full pipeline T0 + T1 + T2 | 98.4% | 64.4% | 1.0% | 13.6 / 674 ms |
+| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.6 / 1.1 ms |
+| T1 classifier alone (DeBERTa, threshold 0.5) | 78.0% | 69.6% | 19.0% | 11.7 / 22.0 ms |
+| Full pipeline T0 + T1 + T2 | 98.5% | 66.5% | 1.0% | 16.4 / 818 ms |
 
-- On the bank-operations set alone: 117 of 134 attacks stopped (87%), 2 false positives in 144 benign prompts (1.4%).
-- On `deepset/prompt-injections`: 8 of 60. Most items there are role-play or topic-change requests that our judge questions do not count as attacks on a bank assistant. We report it anyway.
-- The judge question for user messages was refined after this run; measured separately on 246 user prompts it gives 75.5% recall with 0 false positives at the block threshold (it was 73.5% with 1 false positive).
+- On the bank-operations set alone: 120 of 134 attacks stopped (90%), 2 false positives in 144 benign prompts (1.4%).
+- On `deepset/prompt-injections`: 9 of 60. Most items there are role-play or topic-change requests that our judge questions do not count as attacks on a bank assistant. We report it anyway.
+- This run (2026-10-04 01:52) uses the refined judge question for user messages (sharing one's own configuration or keys is not an attack); measured separately on 246 user prompts that question gives 75.5% recall with 0 false positives at the block threshold.
 
 ## Red team (slide: robustness)
 

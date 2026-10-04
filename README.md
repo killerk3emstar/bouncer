@@ -13,7 +13,7 @@ client = OpenAI(base_url="http://localhost:8700/v1", api_key="<your Bouncer agen
 
 ```bash
 make setup     # uv sync (Python 3.12), creates .env from .env.example
-make test      # offline test suite: 1097 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
+make test      # offline test suite: 1099 tests, no network, no models, about 10 s (15 to 20 s on the first run of a fresh clone)
 make dev       # gateway :8700 + simulated model API :8702 + demo MCP server :8703 + feed server :8704
 ```
 
@@ -141,11 +141,11 @@ All on an Apple M4 Pro (48 GB), shared with other work during the measurements. 
 
 | Layer | Precision | Recall | False-positive rate | Latency p50 / p95 |
 |---|---|---|---|---|
-| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.4 / 0.8 ms |
-| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 10.5 / 20.4 ms |
-| Full pipeline (T0 + T1 + T2 judge) | 98.4% | 64.4% | 1.0% | 13.6 / 674 ms |
+| T0 deterministic only | 98.7% | 39.7% | 0.5% | 0.6 / 1.1 ms |
+| T1 classifier alone (score >= 0.5) | 78.0% | 69.6% | 19.0% | 11.7 / 22.0 ms |
+| Full pipeline (T0 + T1 + T2 judge) | 98.5% | 66.5% | 1.0% | 16.4 / 818 ms |
 
-On the bank-operations set alone the pipeline catches 117 of 134 attacks (87%) with 2 false positives in 144 benign prompts. On `deepset/prompt-injections` it catches 8 of 60: most of those items are role-play or topic-change requests ("act as a storyteller") that our judge questions do not treat as an attack on a bank assistant. T1 alone flags too many business prompts, so in the default profile it only routes text to the judge. This run (2026-10-04 00:59) predates a change that was not re-measured with `make eval-full`: the judge's question for user messages was reworded afterwards (sharing one's own configuration or keys is not an attempt).
+On the bank-operations set alone the pipeline catches 120 of 134 attacks (90%) with 2 false positives in 144 benign prompts. On `deepset/prompt-injections` it catches 9 of 60: most of those items are role-play or topic-change requests ("act as a storyteller") that our judge questions do not treat as an attack on a bank assistant. T1 alone flags too many business prompts, so in the default profile it only routes text to the judge.
 
 **Red team** (82 attacks across 22 attack classes, 46 hard benign prompts, through the real pipeline with the real T1 and the deterministic judge stand-in; [reports/redteam.md](reports/redteam.md)): 82/82 attacks stopped, 46/46 benign prompts allowed.
 
@@ -153,7 +153,7 @@ On the bank-operations set alone the pipeline catches 117 of 134 attacks (87%) w
 
 **Overhead** (`make bench`, simulated model, 200 requests per scenario; [reports/bench.md](reports/bench.md)): gateway overhead p50 10.8 ms for a short prompt and 83 ms for a 2 KB prompt, of which T1 is 88 to 95%; 0.2 ms for a repeated prompt (cached). Throughput of one worker: about 187 req/s with T1 at 8 to 32 concurrent clients (p95 98 ms at 32 clients), about 620 req/s without it. MCP gateway: 7.7 ms overhead p50 per tool call (measured once during development against the live stack; not part of `make bench`).
 
-**Tests**: `make test` runs 1097 tests (437 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
+**Tests**: `make test` runs 1099 tests (437 YAML cases through the full gateway, plus unit tests) in about 10 s without network or models.
 
 ## Architecture
 
