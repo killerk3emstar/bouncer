@@ -95,10 +95,10 @@ COVERAGE_MAP: dict[str, list[tuple[str, str]]] = {
 COVERAGE_NOTES = {
     "LLM04": "Only model-source allowlist and trust_remote_code / unsafe deserialization signatures; training data is out of scope.",
     "LLM08": "Retrieved fragments and tool results are scanned like untrusted input; no vector store access control.",
-    "LLM09": "Not covered: hallucination and misinformation are out of scope for a control layer.",
+    "LLM09": "Hallucination and misinformation are out of scope for a control layer.",
     "ASI03": "API key per agent with model/tool allowlists; delegation only where the policy allows it, with the intersection of both agents' permissions.",
     "ASI06": "Tool results are scanned before they enter the context, and content saved with memory/knowledge-base tools (tool_governance.memory_write_tools) is scanned like untrusted input.",
-    "ASI07": "Partial: an agent calling for another agent (X-Bouncer-On-Behalf-Of) needs principals.<id>.may_act_for and gets the intersection of both agents' permissions; messages between agents can be checked with /v1/guard/check. Messages are not signed end to end.",
+    "ASI07": "An agent calling for another agent (X-Bouncer-On-Behalf-Of) needs principals.<id>.may_act_for and gets the intersection of both agents' permissions; messages between agents can be checked with /v1/guard/check. Messages are not signed end to end.",
     "ASI08": "Budgets, step limits and loop breakers stop runaway sessions; no cross-agent failure isolation.",
     "ASI09": "Human approval for risky calls; no UI-level trust signals.",
     "ASI10": "Loop breakers and goal-alignment checks; no behavioral baseline per agent.",
@@ -487,7 +487,9 @@ async def coverage(request: Request) -> dict[str, Any]:
                 "monitor": sum(1 for s in enabled if s["mode"] == "monitor"),
                 "disabled": len(states) - len(enabled),
             },
-            "tests": {"total": sum(c["total"] for c in counts.values()), "passed": last.get("passed"), "failed": last.get("failed"), "last_run": last.get("started_at")},
+            # after a run, passed/failed/total all come from that run (the dashboard self-test runs the YAML
+            # cases only); before it, the total is every counted case including the MCP unit tests
+            "tests": {"total": last.get("total") or sum(c["total"] for c in counts.values()), "passed": last.get("passed"), "failed": last.get("failed"), "last_run": last.get("started_at")},
         },
     }
 
