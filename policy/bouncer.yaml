@@ -262,3 +262,19 @@ audit:
 
 approvals:
   ttl_seconds: 600                 # an approval allows exactly that call (hash) for this long
+
+# ---------------------------------------------------------------------------
+# Agent-to-agent (A2A) gateway: POST /a2a/<agent_id> (JSON-RPC message/send)
+# OWASP Agentic ASI07. The caller authenticates with its own Bouncer key. Its message is checked like a
+# user message from another agent (secrets and PII redacted, injection, signatures, harmful requests,
+# T1/T2); the target agent's reply is checked like an untrusted tool result plus the output checks
+# (markdown exfiltration, HTML). Messages are not signed end to end.
+# ---------------------------------------------------------------------------
+a2a:
+  max_message_chars: 20000         # all text of one message, either direction; longer messages are blocked
+  timeout_seconds: 30              # how long Bouncer waits for the target agent
+  agents:                          # only agents listed here can be called through Bouncer
+    risk-analyst:
+      url: http://127.0.0.1:8707/  # demo agent (demo/a2a_agent.py); env BOUNCER_A2A_URL_RISK_ANALYST overrides
+      allowed_callers: [ops-copilot, playground]   # principal ids; with X-Bouncer-On-Behalf-Of both agents must be listed
+      description: Demo risk analyst agent (deterministic replies, fake data)

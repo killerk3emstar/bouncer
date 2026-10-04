@@ -202,7 +202,7 @@ class ScanContext:
 
     policy: CompiledPolicy
     principal: Principal
-    route: str = "openai.chat"  # openai.chat | mcp.call | mcp.list | guard.check
+    route: str = "openai.chat"  # openai.chat | mcp.call | mcp.list | a2a.send | a2a.card | guard.check
     session_id: str = ""
     profile: str = "balanced"
     model: str | None = None

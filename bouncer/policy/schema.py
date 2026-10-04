@@ -303,6 +303,20 @@ class ApprovalsCfg(Strict):
     ttl_seconds: int = Field(600, ge=1)
 
 
+class A2AAgentCfg(Strict):
+    url: str  # JSON-RPC endpoint of the target agent (A2A message/send)
+    card_url: str | None = None  # agent card; None = <origin of url>/.well-known/agent.json
+    allowed_callers: list[str] = []  # principal ids that may send messages to this agent
+    description: str | None = None
+
+
+class A2ACfg(Strict):
+    enabled: bool = True
+    max_message_chars: int = Field(20000, ge=1)  # text of all parts of one message, either direction
+    timeout_seconds: float = Field(30.0, gt=0)
+    agents: dict[str, A2AAgentCfg] = {}
+
+
 class PolicyDoc(Strict):
     version: int = 1
     profile: ProfileName = "balanced"
@@ -315,6 +329,7 @@ class PolicyDoc(Strict):
     judge: JudgeCfg = JudgeCfg()
     audit: AuditCfg = AuditCfg()
     approvals: ApprovalsCfg = ApprovalsCfg()
+    a2a: A2ACfg = A2ACfg()
 
     @model_validator(mode="after")
     def _references(self) -> PolicyDoc:
@@ -329,6 +344,12 @@ class PolicyDoc(Strict):
             for other in p.may_act_for:
                 if other not in self.principals:
                     errors.append(f"principals.{pid}.may_act_for: unknown principal '{other}'")
+        for aid, agent in self.a2a.agents.items():
+            for caller in agent.allowed_callers:
+                if caller not in self.principals:
+                    errors.append(f"a2a.agents.{aid}.allowed_callers: unknown principal '{caller}'")
+            if not agent.url.startswith(("http://", "https://")):
+                errors.append(f"a2a.agents.{aid}.url: must start with http:// or https://")
         if self.budgets and self.budgets.on_exceed.downgrade_to:
             if self.budgets.on_exceed.downgrade_to not in self.models:
                 errors.append(

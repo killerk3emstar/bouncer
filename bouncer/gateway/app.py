@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_client import generate_latest
 
 from bouncer.audit import AuditLog
-from bouncer.gateway import guard_api, openai_proxy
+from bouncer.gateway import a2a_gateway, guard_api, openai_proxy
 from bouncer.gateway.state import (
     GatewayState,
     JudgeAdapter,
@@ -164,6 +164,7 @@ def create_app(
         return JSONResponse({"error": {"type": "invalid_request", "code": "request.invalid", "message": msg, "details": details}}, status_code=422)
     app.include_router(openai_proxy.router)
     app.include_router(guard_api.router)
+    app.include_router(a2a_gateway.router)  # /a2a/{agent_id} (agent-to-agent, JSON-RPC message/send)
     try:
         from bouncer.gateway import admin_api
 

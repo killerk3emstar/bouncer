@@ -170,6 +170,7 @@ class GatewayState:
     engine: Engine
     judge: JudgeAdapter
     upstream_transport: httpx.AsyncBaseTransport | None = None
+    a2a_transport: httpx.AsyncBaseTransport | None = None  # tests: the target agents as an ASGI app
     clients: dict[str, httpx.AsyncClient] = field(default_factory=dict)
     feed_store: Any = None
     started_at: float = 0.0

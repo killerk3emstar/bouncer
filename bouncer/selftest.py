@@ -22,6 +22,8 @@ from typing import Any
 import httpx
 import yaml
 
+from demo.a2a_agent import AgentState
+from demo.a2a_agent import create_app as create_a2a_agent
 from demo.mock_upstream import MockState
 from demo.mock_upstream import create_app as create_mock
 
@@ -142,6 +144,8 @@ class CaseRunner:
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.mock_state = MockState()
         self.transport = httpx.ASGITransport(app=create_mock(self.mock_state))
+        self.a2a_state = AgentState()  # demo A2A agent (risk-analyst) for a2a cases
+        self.a2a_transport = httpx.ASGITransport(app=create_a2a_agent(self.a2a_state))
         # test keys are passed to the app explicitly; the process environment is never modified,
         # so running the self-test inside a live gateway does not touch the real agent keys
         self.keys: dict[str, str] = {}
@@ -189,6 +193,7 @@ class CaseRunner:
             key_overrides=key_env,
         )
         app = create_app(settings, upstream_transport=self.transport, classifier=clf, fake_judge=fake_judge)
+        app.state.gw.a2a_transport = self.a2a_transport
         app.state.fake_judge = fake_judge
         app.state.fake_t1 = clf
         self._apps[key] = app
@@ -214,6 +219,7 @@ class CaseRunner:
         g = app.state.gw
         g.store.reset()
         self.mock_state.reset()
+        self.a2a_state.reset()
         if app.state.fake_judge is not None:
             app.state.fake_judge.reset()
         if app.state.fake_t1 is not None:
@@ -248,11 +254,26 @@ class CaseRunner:
         if mock:
             self.mock_state.script(mock if isinstance(mock, list) else [mock])
         n_before = len(self.mock_state.requests)
+        a2a_before = len(self.a2a_state.requests)
         headers = {"X-Bouncer-Session": step.get("session", session), **{str(k): str(v) for k, v in (step.get("headers") or {}).items()}}
         if principal is not None and step.get("auth", True):
             headers["Authorization"] = f"Bearer {step.get('api_key') or self.keys.get(principal, 'bk_unknown')}"
+        a2a = step.get("a2a")
         if "guard" in step:
             resp = await client.post("/v1/guard/check", json=step["guard"], headers=headers)
+        elif a2a is not None:
+            agent = a2a.get("agent", "risk-analyst")
+            if a2a.get("card"):
+                resp = await client.get(f"/a2a/{agent}/.well-known/agent.json", headers=headers)
+            else:
+                parts = a2a.get("parts") or [{"kind": "text", "text": a2a.get("text", "")}]
+                rpc = a2a.get("request") or {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": a2a.get("method", "message/send"),
+                    "params": {"message": {"role": "user", "messageId": f"m-{res.id}", "parts": parts}},
+                }
+                resp = await client.post(f"/a2a/{agent}", json=copy.deepcopy(rpc), headers=headers)
         else:
             resp = await client.post("/v1/chat/completions", json=copy.deepcopy(step.get("request") or {}), headers=headers)
         raw = resp.text
@@ -266,6 +287,9 @@ class CaseRunner:
         event = g.audit.get(trace_id) if trace_id else None
         action = event.get("action") if event else resp.headers.get("x-bouncer-action")
         fids = [f.get("id", "") for f in (event or {}).get("findings", [])]
+        req_trace = resp.headers.get("x-bouncer-request-trace-id")  # a2a: the request event of the same call
+        if req_trace:
+            fids = [f.get("id", "") for f in (g.audit.get(req_trace) or {}).get("findings", [])] + fids
         res.actions.append(str(action))
         res.findings.append(fids)
         if trace_id:
@@ -282,7 +306,8 @@ class CaseRunner:
             hit = [f for f in fids if _matches(f, exp)]
             if hit:
                 res.failures.append(f"{label}unexpected finding {hit[0]}")
-        sent = json.dumps(self.mock_state.requests[n_before:], ensure_ascii=False)
+        upstream_requests = self.a2a_state.requests[a2a_before:] if a2a is not None else self.mock_state.requests[n_before:]
+        sent = json.dumps(upstream_requests, ensure_ascii=False)
         for s in expect.get("upstream_must_not_contain") or []:
             if s in sent:
                 res.failures.append(f"{label}upstream received {s!r}")
@@ -290,7 +315,7 @@ class CaseRunner:
             if s not in sent:
                 res.failures.append(f"{label}upstream did not receive {s!r}")
         if expect.get("upstream_called") is not None:
-            called = len(self.mock_state.requests) > n_before
+            called = bool(upstream_requests)
             if called != bool(expect["upstream_called"]):
                 res.failures.append(f"{label}upstream_called expected {expect['upstream_called']}, got {called}")
         for s in expect.get("response_must_not_contain") or []:

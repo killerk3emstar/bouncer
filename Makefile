@@ -3,7 +3,7 @@ SHELL := /bin/bash
 UV ?= uv
 PY := $(UV) run python
 
-.PHONY: help setup models dev gateway mock mcp feed judge judge-fake test test-live eval eval-full harm-probe bench demo verify-audit sign-feed lint docker-build docker-up docker-down docker-test clean-data
+.PHONY: help setup models dev gateway mock mcp feed judge judge-fake test test-live eval eval-full harm-probe bench demo verify-audit sign-feed lint a2a-agent a2a-demo docker-build docker-up docker-down docker-test clean-data
 
 help:
 	@echo "make setup         install dependencies (uv sync) and create .env from .env.example"
@@ -42,6 +42,12 @@ mock:
 
 mcp:
 	$(PY) -m demo.mcp_server
+
+a2a-agent:
+	$(PY) -m demo.a2a_agent
+
+a2a-demo:
+	$(PY) -m demo.a2a_demo $(if $(GATEWAY),--gateway $(GATEWAY),)
 
 feed:
 	$(PY) scripts/feed_server.py

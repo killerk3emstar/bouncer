@@ -5,7 +5,7 @@ import {
   html, timeEl, actionPill, topFinding, findingId, fmtMs, principalLabel, errorBox, emptyRow, ACTIONS, ACTION_LABEL,
 } from '../util.js';
 
-const ROUTES = ['openai.chat', 'mcp.call', 'mcp.list', 'guard.check', 'admin'];
+const ROUTES = ['openai.chat', 'mcp.call', 'mcp.list', 'a2a.send', 'a2a.card', 'guard.check', 'admin'];
 const FILTER_KEYS = ['action', 'control', 'principal', 'route', 'q'];
 const MAX_ROWS = 1000;
 
@@ -29,7 +29,7 @@ function row(e, { fresh = false, selected = false } = {}) {
   return html`<tr class="clickable ${fresh ? 'fresh' : ''} ${selected ? 'selected' : ''} ${sys ? 'row-sys' : ''}" data-trace="${e.trace_id}" tabindex="0">
     <td class="nowrap">${timeEl(e.ts)}</td>
     <td class="clip" title="${e.principal && e.principal.id ? `${e.principal.id} (team ${e.principal.team || '–'})` : ''}">${sys ? html`<span class="muted">system</span>` : principalLabel(e.principal)}</td>
-    <td class="nowrap mono">${e.route || '–'}${e.tool && e.tool.name ? html`<div class="hint clip" title="${e.tool.name}">${e.tool.name}</div>` : ''}</td>
+    <td class="nowrap mono">${e.route || '–'}${e.tool && e.tool.name ? html`<div class="hint clip" title="${e.tool.name}">${e.tool.name}</div>` : ''}${e.a2a && e.a2a.agent ? html`<div class="hint clip" title="agent ${e.a2a.agent}">agent ${e.a2a.agent}</div>` : ''}</td>
     <td class="nowrap">${sys ? e.type : e.direction || '–'}</td>
     <td class="clip" title="${e.model || ''}">${e.model || html`<span class="muted">–</span>`}</td>
     <td class="nowrap">${actionPill(e.action)}${e.enforced === false ? html` <span class="pill pill-outline" title="monitor mode: not enforced">monitor</span>` : ''}</td>
