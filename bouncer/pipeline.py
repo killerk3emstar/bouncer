@@ -723,6 +723,11 @@ class Engine:
             loc = (*base_location, k, "function", "arguments")
             seg = Segment(args_text or "", "tool_call", f"tool_call:{name}", False, loc, tool=name)
             clean, seg_findings, _ = self.scan_segment(ctx, seg, use_cache=False)
+            # PII in tool arguments: the arguments reach the tool unchanged (rewriting an IBAN or a recipient would
+            # break a legitimate call), so only entities set to block or require_approval act here, for example a
+            # full card number in an e-mail body. Where other data may go is checked by the recipient rules and the
+            # lethal trifecta; the audit log masks every value anyway.
+            seg_findings = [f for f in seg_findings if f.control != "pii" or f.action >= Action.REQUIRE_APPROVAL]
             call_findings: list[Finding] = list(seg_findings)
             os_cfg = doc.controls.output_safety
             if (

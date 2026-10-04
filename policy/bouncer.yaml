@@ -119,7 +119,7 @@ controls:
       private-key: block
 
   pii:                             # OWASP LLM02
-    directions: [input, output, tool_result]
+    directions: [input, output, tool_result, tool_call]   # tool_call: only block / require_approval entities act; arguments are never rewritten
     entities:                      # validated where a checksum exists
       EMAIL: redact
       PHONE: redact
