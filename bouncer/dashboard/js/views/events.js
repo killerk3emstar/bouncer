@@ -60,7 +60,7 @@ export default {
     el.innerHTML = String(html`
       <div class="view-head">
         <h1>Events</h1>
-        <span class="sub">Every decision is one audit event; click a row for the full decision trace.</span>
+        <span class="sub">One audit event per decision and per policy, feed or approval change; click a row for the full trace.</span>
         <span class="spacer"></span>
         <span class="live" id="live"><span class="live-dot"></span><span class="live-text">connecting</span></span>
         <button type="button" class="btn" id="pause">Pause</button>
