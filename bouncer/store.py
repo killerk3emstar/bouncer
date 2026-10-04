@@ -2,8 +2,8 @@
 scan cache and MCP tool pins.
 
 The gateway itself is stateless per request; this store holds the counters that must be shared.
-With several replicas the same interface would be backed by Redis (atomic INCRBYFLOAT, sorted sets
-for windows); for the single-node demo everything lives in process memory.
+This class keeps everything in process memory (one node, the default). For several replicas,
+bouncer.store_redis.RedisStore implements the same interface on Redis (BOUNCER_STORE=redis://...).
 """
 
 from __future__ import annotations
@@ -73,6 +73,8 @@ class SessionState:
 
 
 class Store:
+    shared = False  # True for a store whose counters outlive the process (Redis): no replay needed
+
     def __init__(self, scan_cache_size: int = 20000) -> None:
         self._lock = threading.RLock()
         self.team_usd: dict[tuple[str, str], float] = defaultdict(float)  # (team, day) -> usd
@@ -120,7 +122,7 @@ class Store:
     def replay_spend(self, events: Any) -> int:
         """Rebuild today's per-team and per-session spend from audit events (after a restart).
 
-        With several replicas these counters live in Redis instead and survive restarts on their own."""
+        RedisStore keeps these counters in Redis, where they survive restarts, and skips the replay."""
         today = day_key()
         n = 0
         for ev in events:

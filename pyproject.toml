@@ -23,10 +23,12 @@ dependencies = [
     "faker>=25.0",
     # Judge backend on Apple Silicon only; Linux containers use the ollama-guard backend.
     "mlx-lm>=0.28; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "redis>=5",
 ]
 
 [dependency-groups]
 dev = [
+    "fakeredis>=2.23",
     "pytest>=8.2",
     "pytest-html>=4.1",
     "pytest-timeout>=2.3",

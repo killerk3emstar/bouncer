@@ -30,6 +30,8 @@ class Settings:
     watch: bool = True
     root: str = "."
     key_overrides: dict[str, str] | None = None  # env var name -> key; used instead of os.environ when set
+    store: str = "memory"  # memory (one node) | redis://host:port/db (several replicas share state)
+    store_prefix: str = "bouncer:"  # key prefix in Redis
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -41,6 +43,8 @@ class Settings:
             judge_override=os.environ.get("BOUNCER_JUDGE") or None,
             admin_token=_admin_token_from_env(),
             watch=os.environ.get("BOUNCER_WATCH", "1") != "0",
+            store=os.environ.get("BOUNCER_STORE", "").strip() or "memory",
+            store_prefix=os.environ.get("BOUNCER_STORE_PREFIX", "").strip() or "bouncer:",
         )
 
 
@@ -61,6 +65,23 @@ def _admin_token_from_env() -> str | None:
     os.environ["BOUNCER_ADMIN_TOKEN"] = token
     log.warning("BOUNCER_ADMIN_TOKEN not set; generated one for this run. Dashboard: http://localhost:%s/ui/?token=%s", os.environ.get("BOUNCER_PORT", "8700"), token)
     return token
+
+
+def build_store(settings: Settings) -> Store:
+    """In-memory store for one node, or the Redis store when BOUNCER_STORE is a redis:// URL.
+
+    An unreachable Redis stops the gateway at startup: silently falling back to process memory would let
+    each replica keep its own budgets and approvals."""
+    url = settings.store
+    if url in ("", "memory"):
+        return Store()
+    if url.startswith(("redis://", "rediss://", "unix://")):
+        from bouncer.store_redis import RedisStore
+
+        store = RedisStore.from_url(url, prefix=settings.store_prefix)
+        log.info("shared store: %s (prefix %s)", url.split("@")[-1], settings.store_prefix)
+        return store
+    raise ValueError(f"BOUNCER_STORE={url!r}: expected 'memory' or a redis:// URL")
 
 
 class JudgeAdapter:

@@ -19,10 +19,16 @@ from prometheus_client import generate_latest
 
 from bouncer.audit import AuditLog
 from bouncer.gateway import guard_api, openai_proxy
-from bouncer.gateway.state import GatewayState, JudgeAdapter, Settings, build_classifier, build_lang_detector
+from bouncer.gateway.state import (
+    GatewayState,
+    JudgeAdapter,
+    Settings,
+    build_classifier,
+    build_lang_detector,
+    build_store,
+)
 from bouncer.pipeline import Engine, new_trace_id
 from bouncer.policy.loader import PolicyManager
-from bouncer.store import Store
 from bouncer.telemetry import Telemetry
 
 log = logging.getLogger("bouncer")
@@ -34,6 +40,7 @@ def build_state(
     upstream_transport: httpx.AsyncBaseTransport | None = None,
     classifier: Any = "default",
     fake_judge: Any = None,
+    store: Any = None,
 ) -> GatewayState:
     telemetry = Telemetry()
     shared: dict[str, Any] = {}
@@ -55,8 +62,10 @@ def build_state(
     audit = AuditLog(settings.audit_path or policy.doc.audit.path, policy.doc.audit.hash_chain)
     holder["audit"] = audit
     holder["policies"] = policies
-    store = Store()
-    store.replay_spend(audit.events)  # daily budgets survive a gateway restart
+    if store is None:
+        store = build_store(settings)
+    if not getattr(store, "shared", False):
+        store.replay_spend(audit.events)  # daily budgets survive a gateway restart (Redis keeps its own)
     clf = build_classifier(settings) if classifier == "default" else classifier
     gw_state = GatewayState(
         settings=settings,
@@ -118,10 +127,11 @@ def create_app(
     upstream_transport: httpx.AsyncBaseTransport | None = None,
     classifier: Any = "default",
     fake_judge: Any = None,
+    store: Any = None,
 ) -> FastAPI:
     load_dotenv(override=False)
     settings = settings or Settings.from_env()
-    state = build_state(settings, upstream_transport, classifier, fake_judge)
+    state = build_state(settings, upstream_transport, classifier, fake_judge, store)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):  # noqa: ANN202
@@ -257,7 +267,14 @@ def main() -> None:
 
     logging.basicConfig(level=os.environ.get("BOUNCER_LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     port = int(os.environ.get("BOUNCER_PORT", "8700"))
-    uvicorn.run(create_app(), host=os.environ.get("BOUNCER_HOST", "127.0.0.1"), port=port, log_level="warning")
+    from bouncer.store_redis import RedisUnavailable
+
+    try:
+        app = create_app()
+    except RedisUnavailable as exc:
+        log.error("%s", exc)
+        raise SystemExit(2) from None
+    uvicorn.run(app, host=os.environ.get("BOUNCER_HOST", "127.0.0.1"), port=port, log_level="warning")
 
 
 if __name__ == "__main__":
